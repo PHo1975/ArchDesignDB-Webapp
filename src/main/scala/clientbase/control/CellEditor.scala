@@ -1,9 +1,9 @@
 package clientbase.control
 
-import org.scalajs.dom.raw.{HTMLElement, KeyboardEvent,Event, Node}
-
-import scalatags.JsDom.all._
 import org.scalajs.dom.document
+import org.scalajs.dom.html.TextArea
+import org.scalajs.dom.raw.{ Event, HTMLElement, KeyboardEvent, Node }
+import scalatags.JsDom.all._
 /**
  * Created by Peter Holzer on 18.09.2015.
  */
@@ -13,7 +13,7 @@ trait Editable  {
 }
 
 class CellEditor {
-  val cell=textarea(`class`:="cellinput",`type`:="text").render
+  val cell: TextArea = textarea(`class` := "cellinput", `type` := "text").render
   var justOpened=false
   /*org.scalajs.dom.document.onkeydown= {key:KeyboardEvent=>{
     key.keyCode match {
@@ -21,7 +21,7 @@ class CellEditor {
       case _=>
     }
   }}*/
-  org.scalajs.dom.window.onresize=(e:Event)=>{
+  org.scalajs.dom.window.onresize = (_: Event) => {
     if (isEditing) {
     if(justOpened)justOpened=false
     else cancelEdit()
@@ -111,5 +111,5 @@ class CellEditor {
     }
   }
 
-  def isEditing=parentNode.isDefined
+  def isEditing: Boolean = parentNode.isDefined
 }

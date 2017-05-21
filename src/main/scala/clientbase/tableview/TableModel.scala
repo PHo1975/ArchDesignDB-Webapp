@@ -1,17 +1,16 @@
 package clientbase.tableview
 
 
-import clientbase.connection.{TableSettings, WebSocketConnector}
+import clientbase.connection.{ TableSettings, WebSocketConnector }
 import clientbase.control._
-import definition.data.{EMPTY_OWNERREF, InstanceData, OwnerReference, Reference}
+import definition.data.{ EMPTY_OWNERREF, InstanceData, OwnerReference, Reference }
 import definition.expression._
 import definition.typ.DataType._
-import definition.typ.{AllClasses, DataType, FieldSetting, SelectGroup}
+import definition.typ.{ AllClasses, DataType, FieldSetting, SelectGroup }
 import org.scalajs.dom
-import org.scalajs.dom.html.{TableCell, TableHeaderCell, TableRow}
+import org.scalajs.dom.html.{ TableCell, TableHeaderCell, TableRow }
 import org.scalajs.dom.raw._
-import util.{Log, StrToInt}
-
+import util.{ Log, StrToInt }
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
@@ -43,14 +42,14 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
   myTable.onkeydown={key:KeyboardEvent=>{
     key.keyCode match {
-      case 13=> if(!key.getModifierState("Control")) startEditMode()
+      case 13 => if (!key.getModifierState("Control") && WebSocketConnector.editable) startEditMode()
       case 35=> if(key.getModifierState("Control")) focusCell(focusedCol,numRows) else focusCell(numCols-1,focusedRow);key.preventDefault()// end
       case 36=> if(key.getModifierState("Control")) focusCell(focusedCol,0) else focusCell(0,focusedRow);key.preventDefault() // home
       case 37=> if(focusedCol>0) focusCell(focusedCol-1,focusedRow);key.preventDefault() // left
       case 38=> if(focusedRow>0)focusCell(focusedCol,focusedRow-1);key.preventDefault() // up
       case 39=> if(focusedCol< numCols-1 ) focusCell(focusedCol+1,focusedRow);key.preventDefault() // right
       case 40=> if(focusedRow< numRows-1 ) focusCell(focusedCol,focusedRow+1);key.preventDefault()// down
-      case 113=> startEditMode()
+      case 113 => if (WebSocketConnector.editable) startEditMode()
       case _=>
     }
   }}
@@ -174,7 +173,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
    val lastRow: TableRow =tr(td(`class`:="firstcol"),for(ix<-tableSettings.indices) yield {
       val cell=td(tabindex:="-1")(div(`class`:="inner")(" ")).render
-      cell.onclick=(e:MouseEvent)=>if(WebSocketConnector.editable){
+     cell.onclick = (e: MouseEvent) => {
         focusedCol=ix
         focusedRow=data.size
         SelectionController.deselect()
@@ -182,14 +181,11 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
         if(!SidepanelController.multiSelectMode)
           cell.focus()
       }
-      cell.ondblclick={e:MouseEvent => startEditMode();e.stopPropagation();e.preventDefault()}
+     cell.ondblclick = { e: MouseEvent => {
+       if (WebSocketConnector.editable) startEditMode(); e.stopPropagation(); e.preventDefault()
+     }
+     }
       cell.oncontextmenu=(e:MouseEvent)=>{
-        /*if((e.buttons & 2)>0 ){
-          focusedCol=ix
-          focusedRow=data.size
-          SidepanelController.printMessage("context "+SidepanelController.multiSelectMode)
-          if(! SidepanelController.multiSelectMode)startEditMode()
-        }*/
         e.stopImmediatePropagation()
         e.preventDefault()
       }
@@ -206,7 +202,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
             focusedCol = ix
             focusedRow = data.size
             cell.focus()
-            if (!SidepanelController.multiSelectMode) startEditMode()
+            if (!SidepanelController.multiSelectMode && WebSocketConnector.editable) startEditMode()
           }
         }
       }
@@ -252,7 +248,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     val inner=div(`class`:="inner")(st).render
     val cell=td(tabindex:="-1")(inner).render
 
-    def onClicked(control:Boolean, shift:Boolean)=if(WebSocketConnector.editable){
+    def onClicked(control: Boolean, shift: Boolean) = {
       cell.focus()
       SelectionController.setFocusedElement(this)
       focusCellClicked(colIx,row,control,shift)
@@ -266,10 +262,6 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       shiftDown=e.getModifierState("Shift")
     }
     cell.oncontextmenu=(e:MouseEvent)=>{
-      //SelectionController.sidePanelController.get.printMessage("edit "+e.buttons)
-      /*if((e.buttons & 2)>0 ) {
-        startEditMode()
-      }*/
       e.stopImmediatePropagation()
       e.preventDefault()
     }
@@ -284,14 +276,12 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
         ) {
           focusedCol = colIx
           if (SidepanelController.multiSelectMode) {
-            //SidepanelController.addMessage("select "+row+" - "+focusedRow)
             selectInterval(focusedRow, row)
-            //cell.focus()
             SelectionController.setFocusedElement(TableModel.this)
             focusedRow = row
           } else {
             focusedRow = row
-            startEditMode()
+            if (WebSocketConnector.editable) startEditMode()
           }
         }
       }
@@ -302,7 +292,10 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       onClicked(controlDown,shiftDown)
     }
 
-    inner.ondblclick={e:MouseEvent => startEditMode();e.stopPropagation();e.preventDefault()}
+    inner.ondblclick = { e: MouseEvent => {
+      if (WebSocketConnector.editable) startEditMode(); e.stopPropagation(); e.preventDefault()
+    }
+    }
     cell
   }
 

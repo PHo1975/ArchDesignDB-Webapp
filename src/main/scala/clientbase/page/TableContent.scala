@@ -4,11 +4,10 @@ import clientbase.connection.WebSocketConnector
 import clientbase.control.SelectionController
 import clientbase.tableview.PathModel
 import clientbase.tilelayout.TileContent
-import definition.data.{Referencable, Reference}
+import definition.data.{ Referencable, Reference }
 import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.HTMLElement
 import org.scalajs.dom.window
-
 import scalatags.JsDom.all._
 
 /**
@@ -18,7 +17,7 @@ class TableContent extends TileContent {
   def load():Unit={}
   def save():Unit={}
   val pathDiv: Div =div(`class`:="headerdiv").render
-  val contentDiv: Div =div(style:="overflow:auto").render
+  val contentDiv: Div = div(overflow := "auto").render
   val content:HTMLElement =div(`class`:="table-tile")( pathDiv,contentDiv).render
   val pathMod: PathModel =  new PathModel(pathDiv, contentDiv)
 

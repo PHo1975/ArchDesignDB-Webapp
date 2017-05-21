@@ -1,7 +1,7 @@
 package clientbase.control
 
+import org.scalajs.dom.html.Input
 import org.scalajs.dom.raw.KeyboardEvent
-
 import scalatags.JsDom.all._
 
 /**
@@ -9,7 +9,7 @@ import scalatags.JsDom.all._
   */
 object ActiveEditField {
 
-  def apply(typeString:String,cssClass:String,callback: (String)=>Unit)= {
+  def apply(typeString: String, cssClass: String, callback: (String) => Unit): Input = {
     val editField = input(`type` := typeString, `class` := cssClass).render
     editField.onkeydown = { key: KeyboardEvent =>
       key.keyCode match {

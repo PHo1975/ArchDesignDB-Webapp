@@ -1,8 +1,7 @@
 package clientbase.viewer2d
 
-import clientbase.connection.WebSocketConnector
 import definition.data.Referencable
-
+import util.Log
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -18,19 +17,19 @@ class LayerList(controller:Viewer2DController) {
     if(nlist.isEmpty) controller.readyLoaded()
     else {
       val layerList=nlist.filter(_.ref.typ==GraphElem.LAYERTYPE).toIndexedSeq
-      println("LayerList "+layerList.mkString("|"))
+      //println("LayerList "+layerList.mkString("|"))
       val numLayer=layerList.size
       var currentLayer=0
 
       def loadNextLayer():Unit= {
-        println("load next layer curr:"+currentLayer+" num:"+numLayer)
+        //println("load next layer curr:"+currentLayer+" num:"+numLayer)
         if(currentLayer<numLayer) {
           val layer=layerList(currentLayer).ref
           val subscriber=new LayerSubscriber(layer,controller)
           subscriberList+= subscriber
           currentLayer+=1
-          println("load "+layer)
-          subscriber.load(layer,0,loadNextLayer _)
+          //println("load "+layer)
+          subscriber.instSubscriber.load(layer, -1, Some(loadNextLayer _))
         } else readyLoaded()
       }
 
@@ -39,7 +38,7 @@ class LayerList(controller:Viewer2DController) {
   }
 
   def calcBounds(): BRect ={
-    println("Calcbounds "+subscriberList.size)
+    //println("Calcbounds "+subscriberList.size)
     var x1=Double.MaxValue
     var y1=Double.MaxValue
     var x2=Double.MinValue
@@ -56,8 +55,10 @@ class LayerList(controller:Viewer2DController) {
   }
 
   def readyLoaded():Unit={
-    println("ready loaded")
+    //println("list ready loaded " +subscriberList.size)
     loaded=true
+    if (subscriberList.nonEmpty)
+      subscriberList.head.show()
     controller.readyLoaded()
   }
 
@@ -65,6 +66,17 @@ class LayerList(controller:Viewer2DController) {
     for (s<-subscriberList) s.unsubscribe()
     subscriberList.clear()
  }
+
+  def removeLayer(l: LayerSubscriber): Unit = {
+    subscriberList.indexWhere(_.layerRef == l.layerRef) match {
+      case -1 => Log.e("removeLayer not possible " + l.layerRef)
+      case ix =>
+        l.hide()
+        subscriberList(ix).unsubscribe()
+        subscriberList.remove(ix)
+        controller.layerPan.removeLayer(ix)
+    }
+  }
 
 
 }

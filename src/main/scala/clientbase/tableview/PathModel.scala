@@ -1,15 +1,14 @@
 package clientbase.tableview
 
-import clientbase.connection.{InstSubscriber, Subscriber, WebSocketConnector}
-import clientbase.control.{SelectionController, SidepanelController}
-import definition.data.{InstanceData, OwnerReference, Reference}
+import clientbase.connection.{ InstSubscriber, WebSocketConnector }
+import clientbase.control.SelectionController
+import definition.data.{ InstanceData, OwnerReference, Reference }
 import definition.typ.AllClasses
 import org.scalajs.dom
-import org.scalajs.dom.raw.{HTMLDocument, HTMLElement}
-import util.Log
 import org.scalajs.dom.document
 import org.scalajs.dom.html.Paragraph
-
+import org.scalajs.dom.raw.HTMLElement
+import util.Log
 import scalatags.JsDom.all._
 
 /**
@@ -45,7 +44,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
       val propField=prFields(prIx)
       if(!propField.hidden) {
         val createClasses=propField.createChildDefs.filter(a=>a.editorName==""&&a.action.isEmpty)
-        val rowDiv=div(`style`:="overflow:hidden;clear:both;").render
+        val rowDiv = div(overflow := "hidden", clear := "both").render
         rowDiv.appendChild(p(`class`:="prfieldtitle")(propField.name+":").render)
         if(createClasses.nonEmpty){
           def clearButtons()={
@@ -61,7 +60,8 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
                 clearButtons()
               }})(cr.childName).render)
           }
-          rowDiv.appendChild(button(`class`:="prfield-createbutton",onclick:={()=>showNewClasses})("Neu...").render)
+
+          if (WebSocketConnector.editable) rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => showNewClasses })("Neu...").render)
         }
         contentNode.appendChild(rowDiv)
         val divNode=div(`class`:="prfielddiv").render

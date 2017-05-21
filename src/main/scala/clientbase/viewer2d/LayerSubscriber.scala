@@ -1,26 +1,45 @@
 package clientbase.viewer2d
 
-import java.io.DataInput
-
-import clientbase.connection.Subscriber
-import clientbase.localstore.SubsMap
-import definition.data.{InstanceData, Reference}
+import clientbase.connection.WebSocketConnector
+import clientbase.localstore.{ SingleInstanceSubs, SubsMap }
+import definition.data.{ InstanceData, Reference }
 import definition.expression.Expression
+import org.scalajs.dom.html.{ Button, Image, TableCell, TableRow }
+import org.scalajs.dom.raw.MouseEvent
 import util.Log
-
 import scala.util.control.NonFatal
+import scalatags.JsDom.all._
 
 /**
   * Created by Peter Holzer on 11.02.2017.
   */
-class LayerSubscriber(layerRef:Reference,controller:Viewer2DController) extends SubsMap[GraphElem] {
-  var visible=true
-  override def factory(in: DataInput): GraphElem = {
+class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) extends SubsMap[GraphElem] {
+  var visible = false
+  var editable = false
+  val nameCell: TableCell = td().render
+  val numCell: TableCell = td().render
+  val scaleCell: TableCell = td().render
+  val eyeIcon: TableCell = td(onclick := { (_: MouseEvent) => toggleVisibility() })(img(src := "eye.gif")).render
+  val editIcon: TableCell = td(img(src := "editsmall.gif")).render
+  val newElemIcon: Image = img(src := "newElem.gif").render
+  val newElemPlace: TableCell = td().render
+  val removeBut: Button = button(onclick := { (_: MouseEvent) => {
+    controller.layerList.removeLayer(this)
+  }
+  })("X").render
+  val row: TableRow = if (WebSocketConnector.editable) tr(`class` := "layertable-row")(eyeIcon, editIcon, newElemPlace, numCell, nameCell, scaleCell, removeBut).render
+                      else tr(`class` := "layertable-row")(eyeIcon, numCell, nameCell, scaleCell, removeBut).render
 
-    try {
+  val instSubscriber = new SingleInstanceSubs((inst) => {
+    //println("Insubscriber update "+inst)
+    numCell.innerHTML = inst.fieldValue(0).toString
+    nameCell.innerHTML = inst.fieldValue(1).toString
+    scaleCell.innerHTML = controller.scaleToString(ScaleModel.scales.getOrElse(inst.fieldValue(2).toInt, 0d))
+  })
+
+  override def factory(in: DataInput): GraphElem = try {
       val ref = Reference(in)
       ref.typ match {
-
         case GraphElem.LINETYPE =>
           val nfields = in.readByte
           //print("create Line "+ref+" fields:"+nfields)
@@ -54,11 +73,36 @@ class LayerSubscriber(layerRef:Reference,controller:Viewer2DController) extends 
       }
     } catch {
       case NonFatal(e)  => Log.e("factory ",e);null
-    }
   }
 
   override def update(data: Iterator[GraphElem]):Unit = {
+    //println("update "+layerRef)
     controller.dataUpdated()
+    for (el <- map.valuesIterator) {
+      val gr = el.geometry
+      try {
+        if (gr != null) controller.canvasHandler.addGeometry(gr)
+      } catch {
+        case e: Throwable => Log.e("add geometry " + el, e)
+      }
+    }
+  }
+
+  override def onChange(data: GraphElem): Unit = {
+    for (oldElem <- map.get(data.ref))
+      controller.canvasHandler.removeGeometry(oldElem.geometry)
+    map(data.ref) = data
+    controller.canvasHandler.addGeometry(data.geometry)
+    update(map.valuesIterator)
+  }
+
+  override def destructor(elem: GraphElem): Unit = {
+    controller.canvasHandler.removeGeometry(elem.geometry)
+  }
+
+  override def onChildAdded(data: GraphElem): Unit = {
+    controller.canvasHandler.addGeometry(data.geometry)
+    super.onChildAdded(data)
   }
 
 
@@ -77,6 +121,30 @@ class LayerSubscriber(layerRef:Reference,controller:Viewer2DController) extends 
         if(l.maxY>y2) y2=l.maxY
     }
     BRect(x1,y1,x2,y2)
+  }
+
+  def toggleVisibility(): Unit = {
+    if (visible) hide() else show()
+  }
+
+  def show(): Unit = if (!visible && subsID == -1) {
+    //println("show "+layerRef)
+    load(layerRef, 0, () => {
+      eyeIcon.style.background = "blue"
+      controller.zoomAll()
+    })
+    visible = true
+  }
+
+  def hide(): Unit = if (visible && subsID != -1) {
+    val handler = controller.canvasHandler
+    for (el <- map.valuesIterator)
+      handler.removeGeometry(el.geometry)
+    unsubscribe()
+    map.clear()
+    controller.canvasHandler.repaint()
+    eyeIcon.style.background = "white"
+    visible = false
   }
 
 }

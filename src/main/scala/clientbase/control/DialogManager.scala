@@ -4,6 +4,7 @@ import clientbase.connection.WebSocketConnector
 import definition.data.Referencable
 import definition.expression.Constant
 import definition.typ._
+import scala.collection.mutable.ArrayBuffer
 
 /**
   * Created by Peter Holzer on 26.12.2015.
@@ -17,7 +18,7 @@ object DialogManager {
   var isQuestionRepeating=false
 
   val answerController=new AnswerController()
-  val answerList=scala.collection.mutable.ArrayBuffer[(String,Constant)]()
+  val answerList: ArrayBuffer[(String, Constant)] = scala.collection.mutable.ArrayBuffer[(String, Constant)]()
 
   def loadAction(newAction:ActionTrait):Unit={
     if(currentAction.isDefined)reset()
@@ -35,20 +36,18 @@ object DialogManager {
     }
   }
 
-
-  def loadQuestion (question:ParamQuestion)= {
+  def loadQuestion(question: ParamQuestion): Unit = {
     currentQuestion=Some(question)
     question match {
-      case d: DialogQuestion => {
+      case d: DialogQuestion =>
         SidepanelController.showAnswerPanel()
         answerController.loadAnswerDefinitions(d)
-      }
       case o=> println("Unknown question "+o)
     }
   }
 
-  def reset()={
-    for(c<-currentAction){
+  def reset(): Unit = {
+    for (_ <- currentAction) {
       currentAction=None
       SelectionController.select(currentSelection)
       currentQuestion=None
@@ -64,7 +63,7 @@ object DialogManager {
     adef.followQuestion match {
       case Some(fq)=> loadQuestion(fq)
       case None => repeatQuestion match {
-        case Some(rQuestion) =>
+        case Some(_) =>
           isQuestionRepeating=true
           loadQuestion(repeatQuestion.get) // if repeatquestion was changed by a custom listener
         case None=>  // action is done
@@ -73,7 +72,7 @@ object DialogManager {
     }
   } else util.Log.e("Answer given without active Action "+adef+" "+result)
 
-  def processResults() = {
+  def processResults(): Unit = {
     currentAction match {
       case Some(action)=>
         for(group <-SelectionController.currentSelection)

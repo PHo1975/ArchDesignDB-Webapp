@@ -2,16 +2,12 @@ package clientbase.page
 
 import clientbase.connection.WebSocketConnector
 import clientbase.control.SidepanelController
-import clientbase.tableview.PathModel
-import clientbase.tilelayout.{ContentFactory, Tile}
+import clientbase.tilelayout.{ ContentFactory, Tile }
 import clientbase.viewer2d.Viewer2DController
-import definition.data.Reference
-import org.scalajs.dom.raw.{HTMLElement, PopStateEvent}
-import org.scalajs.dom.{document, window}
+import org.scalajs.dom.document
+import org.scalajs.dom.raw.HTMLElement
 import util.Log
-
 import scala.scalajs.js.JSApp
-import scala.scalajs.js.annotation.JSExport
 import scala.util.control.NonFatal
 
 
@@ -19,15 +15,17 @@ import scala.util.control.NonFatal
  * Created by Peter Holzer on 05.04.2015.
  */
 object Main extends JSApp {
-  @JSExport
   override def main(): Unit = {
     //println("main ready "+window.location.href+"|"+window.location.pathname)
 
     try {
+      val mainPanel = document.getElementById("mainpanel").asInstanceOf[HTMLElement]
+      //mainPanel.innerHTML="2"
+      val statusLine = document.getElementById("statusline").asInstanceOf[HTMLElement]
+      statusLine.innerHTML = "2"
       WebSocketConnector.start("WebTab", () => {
-        //println("sytemsettings loaded")
+        document.body.removeChild(statusLine)
         val sidepanelRoot = document.getElementById("sidepanel").asInstanceOf[HTMLElement]
-        val mainPanel = document.getElementById("mainpanel").asInstanceOf[HTMLElement]
         SidepanelController.setup(sidepanelRoot, mainPanel)
         Tile.factoryList = List(ContentFactory("Z", "Zeichnung", () => new Viewer2DController()), ContentFactory("T", "Tabelle", () => new TableContent()))
 

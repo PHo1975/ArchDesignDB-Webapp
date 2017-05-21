@@ -2,9 +2,8 @@ package clientbase.viewer2d
 
 import clientbase.connection.WebObjectClass
 import definition.expression.VectorConstant
-import definition.typ.{AllClasses, SystemSettings}
-import util.{ColonSplit, Log, StrToDouble}
-
+import definition.typ.AllClasses
+import util.{ ColonSplit, Log, StrToDouble }
 import scala.collection.immutable.SortedMap
 
 /**
@@ -122,8 +121,8 @@ class ScaleModel extends Scaler {
     //System.out.println("Set world bounds :x="+x+" y="+y+" w="+w+" h="+h+" "+Thread.currentThread().getStackTrace()(2))
     _world_X = x
     _world_Y = y
-    _world_Width = if (w == 0) 0.1 else math.abs(w)
-    _world_Height = if (h == 0) 0.1 else math.abs(h)
+    _world_Width = if (w == 0) 0.1 else w
+    _world_Height = if (h == 0) 0.1 else h
     zoomStack = collection.immutable.List(BRect(_world_X, _world_Y, _world_Width, _world_Height))
     calcOffsets()
     notifyScaleChanged()
@@ -183,6 +182,32 @@ class ScaleModel extends Scaler {
     notifyScaleChanged()
   }
 
+  def zoomOutBy(factor: Double): Unit = {
+    val w = wbx2 - wbx1
+    val h = wby2 - wby1
+    _world_X = wbx1 - w * factor
+    _world_Width = w + w * factor * 2
+    _world_Y = wby1 - h * factor
+    _world_Height = h + h * factor * 2
+    updateTopStackElement()
+    calcOffsets()
+    notifyScaleChanged()
+  }
+
+  def zoomInBy(factor: Double): Unit = {
+    val w = wbx2 - wbx1
+    val h = wby2 - wby1
+    if (w > 2 * factor * 2 && h > h * factor * 2) {
+      _world_X = wbx1 + w * factor
+      _world_Width = w - w * factor * 2
+      _world_Y = wby1 + h * factor
+      _world_Height = h - h * factor * 2
+      updateTopStackElement()
+      calcOffsets()
+      notifyScaleChanged()
+    }
+  }
+
   def updateTopStackElement(): Unit = zoomStack = BRect(_world_X, _world_Y, _world_Width, _world_Height) :: zoomStack.tail
 
   def moveLeft(): Unit = {
@@ -213,7 +238,7 @@ class ScaleModel extends Scaler {
     notifyScaleChanged()
   }
 
-  def move(dx:Double,dy:Double)= {
+  def move(dx: Double, dy: Double): Unit = {
     _world_X +=dx/scale
     _world_Y -=dy/scale
     updateTopStackElement()
@@ -307,7 +332,7 @@ class ScaleModel extends Scaler {
 
   def xToWorld(x: Int): Double = (x - xOffset) / scale + _world_X
 
-  def yToWorld(y: Int): Double = (_world_Y + _world_Height) - ((y - yOffset).toDouble / scale)
+  def yToWorld(y: Int): Double = (_world_Y + _world_Height) - ((y - yOffset) / scale)
 
   //def getScreenPos(px:Double,py:Double):Point.Float= new Point(xToScreen(px),yToScreen(py))
 
@@ -343,5 +368,13 @@ class ScaleModel extends Scaler {
     * @return true if it is inside of the world bounds
     */
   def isInWorldBounds(tp: VectorConstant): Boolean = tp.x >= wbx1 && tp.x <= wbx2 && tp.y >= wby1 && tp.y <= wby2
+
+  def get2DCameraPos: (Double, Double, Double) = {
+    val width = wbx2 - wbx1
+    val height = wby2 - wby1
+    (wbx1 + width / 2d,
+      wby1 + height / 2d,
+      height / 2 * 1.05)
+  }
 
 }

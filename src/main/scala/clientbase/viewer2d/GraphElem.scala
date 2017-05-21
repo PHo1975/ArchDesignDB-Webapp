@@ -1,14 +1,60 @@
 package clientbase.viewer2d
 
-import definition.data.{Referencable, Reference}
+import definition.data.{ Referencable, Reference }
 import definition.expression._
-import org.scalajs.dom.ext.Color
+import org.denigma.threejs._
 import org.scalajs.dom.raw.CanvasRenderingContext2D
 import util.Log
+import scala.collection.mutable
+import scala.scalajs.js
+import scala.scalajs.js.annotation.JSGlobal
+import scala.scalajs.js.typedarray.Float32Array
 
 /**
   * Created by Peter Holzer on 11.02.2017.
   */
+
+
+@js.native
+@JSGlobal("THREE.BufferGeometry")
+class MyBufferGeometry extends Geometry {
+  var attributes: js.Array[BufferAttribute] = js.native
+  var drawcalls: js.Any = js.native
+  var offsets: js.Any = js.native
+
+  def addAttribute(name: String, attribute: BufferAttribute): js.Dynamic = js.native
+
+  def addAttribute(name: String, array: js.Any, itemSize: Double): js.Dynamic = js.native
+
+  def getAttribute(name: String): js.Dynamic = js.native
+
+  def setIndex(index: js.Array[Int]): Unit = js.native
+
+  def addDrawCall(start: Double, count: Double, index: Double): Unit = js.native
+
+  def fromGeometry(geometry: Geometry, settings: js.Any = js.native): BufferGeometry = js.native
+
+  def computeVertexNormals(): Unit = js.native
+
+  def computeOffsets(indexBufferSize: Double): Unit = js.native
+
+  def merge(): Unit = js.native
+
+  def normalizeNormals(): Unit = js.native
+
+  def reorderBuffers(indexBuffer: Double, indexMap: js.Array[Double], vertexCount: Double): Unit = js.native
+
+  override def clone(): BufferGeometry = js.native
+}
+
+
+@js.native
+@JSGlobal("THREE.PlaneBufferGeometry")
+class PlaneBufferGeometry extends Geometry {
+  def this(width: Double, height: Double, widthSegments: Double = js.native, heightSegments: Double = js.native) = this()
+
+  var parameters: js.Any = js.native
+}
 
 trait Bounds{
   def minX:Double
@@ -28,18 +74,23 @@ trait ElemContainer {
 }
 
 abstract class GraphElem(override val ref:Reference,val color:Int) extends Formatable {
-   def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit
-   def drawWithOffset(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],offSet:VectorConstant):Unit
-   def drawRotated(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],dangle:Double,rotator:VectorConstant=>VectorConstant): Unit
+  //def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit
+  //def drawWithOffset(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],offSet:VectorConstant):Unit
+  //def drawRotated(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],dangle:Double,rotator:VectorConstant=>VectorConstant): Unit
    def getBounds(container: ElemContainer):Bounds
+
+  def geometry: Object3D
 }
 
 class GraphElemStub(override val ref:Reference) extends GraphElem(ref,0)  {
   def getFormatFieldValue(fieldNr:Int):Constant=EMPTY_EX
-  def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit={}
+
+  //def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit={}
   def drawWithOffset(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],offSet:VectorConstant):Unit={}
   def drawRotated(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],dangle:Double,rotator:VectorConstant=>VectorConstant): Unit={}
   def getBounds(container: ElemContainer): Bounds =GraphElem.NULLRECT
+
+  def geometry: Object3D = null
 }
 
 abstract class LinearElement(nref:Reference,ncolor:Int,val lineWidth:Int,val lineStyle:Int) extends GraphElem(nref,ncolor) {
@@ -51,10 +102,11 @@ abstract class LinearElement(nref:Reference,ncolor:Int,val lineWidth:Int,val lin
       case _ => null
     }
   }
-  protected def prepareStroke(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color])={
+
+  /*protected def prepareStroke(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color])={
     ctx.lineWidth=lineWidth/100d/sm.dotPitch
     ctx.strokeStyle="rgb("+(color/256/256)+","+(color/256)%256+","+(color%256)+")"
-  }
+  }*/
 }
 
 abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,val startPoint:VectorConstant,val endPoint:VectorConstant) extends
@@ -74,22 +126,19 @@ abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlin
 case class LineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,nstartPoint:VectorConstant,nendPoint:VectorConstant) extends
   AbstractLineElement(nref,ncolor,nlineWidth,nlineStyle,nstartPoint,nendPoint) {
 
-  def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit=intDraw(ctx,sm,selectColor,nstartPoint,nendPoint)
-
-  override def drawWithOffset(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],offSet:VectorConstant)=
-    intDraw(ctx,sm,selectColor,startPoint+offSet,endPoint+offSet)
-
-  override def drawRotated(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],angle:Double,rotator:VectorConstant=>VectorConstant)=
-    intDraw(ctx,sm,selectColor,rotator(startPoint),rotator(endPoint))
-
-  def intDraw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],p1:VectorConstant,p2:VectorConstant):Unit={
-    prepareStroke(ctx,sm,selectColor)
-    ctx.strokeStyle="black"
-    ctx.beginPath()
-    ctx.moveTo(sm.xToScreen(p1.x) ,sm.yToScreen(p1.y))
-    ctx.lineTo(sm.xToScreen(p2.x),sm.yToScreen(p2.y))
-    ctx.stroke()
-    //println("Line "+p1+" - "+p2+" x1:"+sm.xToScreen(p1.x)+" y1:"+sm.yToScreen(p1.y)+" x2:"+sm.xToScreen(p2.x)+" y2:"+sm.yToScreen(p2.y))
+  lazy val geometry: Object3D = {
+    val delta = endPoint - startPoint
+    val center: VectorConstant = startPoint + (delta * 0.5d)
+    val lw = lineWidth.toDouble / 1000d
+    //val planeBuffer=new PlaneBufferGeometry(delta.toDouble+lw,lw)
+    val mesh = new Mesh(GraphElem.lineGeometry, GraphElem.getMaterial(color))
+    mesh.scale.x = delta.toDouble + lw
+    mesh.scale.y = lw
+    val rot = Math.atan2(delta.y, delta.x)
+    mesh.position.x = center.x //-Math.cos(rot)*lw/2d
+    mesh.position.y = center.y //-math.sin(rot)*lw/2d
+    mesh.rotation.z = rot
+    mesh
   }
 }
 
@@ -101,9 +150,14 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
   lazy val points:Seq[VectorConstant]=List(pointFromAngle(startAngle),pointFromAngle(endAngle),centerPoint)
   protected lazy val bounds: BRect = calcArcBounds
 
+  def deltaW: Double = {
+    val value = endAngle - startAngle + (if (endAngle < startAngle) 360d else 0)
+    if (value == 360d) 360d else value % 360d
+  }
+
   def getBounds(container: ElemContainer): Bounds =bounds
 
-  override def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit= drawWithOffset(ctx,sm,selectColor,NULLVECTOR)
+  /*override def draw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color]):Unit= drawWithOffset(ctx,sm,selectColor,NULLVECTOR)
 
   override def drawWithOffset(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],offSet:VectorConstant):Unit=
     internDraw(ctx,sm,selectColor,centerPoint+offSet,0d)
@@ -111,21 +165,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
   override def drawRotated(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],dangle:Double,rotator:VectorConstant=>VectorConstant): Unit =
     internDraw(ctx,sm,selectColor,rotator(centerPoint),dangle)
 
-  private def internDraw(ctx:CanvasRenderingContext2D,sm:Scaler,selectColor:Option[Color],cPoint:VectorConstant,angle:Double)={
-    prepareStroke(ctx,sm,selectColor)
-    val sAngle=(startAngle+angle)*Math.PI/180d
-    val eAngle=(endAngle+angle)*Math.PI/180d
-    val tx=sm.xToScreen(cPoint.x)
-    val ty=sm.yToScreen(cPoint.y)
-    ctx.beginPath()
-    ctx.arc(tx,ty,diameter*sm.scale,-eAngle,-sAngle,anticlockwise = false)
-    ctx.stroke()
-    val mx=sm.xToScreen(cPoint.x)
-    val my=sm.yToScreen(cPoint.y)
-    ctx.moveTo(mx,my)
-    ctx.lineTo(mx,my)
-    ctx.stroke()
-  }
+  }*/
 
   def pointFromAngle(angle:Double) =
     new VectorConstant(centerPoint.x+scala.math.cos(angle*scala.math.Pi/180d)*diameter,
@@ -146,6 +186,57 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
     }
     GraphElem.getPointsBounds(pointBuffer)
   }
+
+  lazy val geometry: Object3D = {
+    try {
+      val delta = deltaW
+      val steps = Math.floor(delta / GraphElem.schrittWeiteKreis).toInt
+      //println("startA:" + startAngle + " endA:" + endAngle+" delta:"+delta+" steps:"+steps)
+      val apoints = new Float32Array((steps + 2) * 3 * 2)
+      val thick = lineWidth.toDouble / 1000d / 2
+      val d1 = diameter - thick
+      val d2 = diameter + thick
+
+      def setPoints(index: Int, angle: Double) = {
+        val radAngle = angle * Math.PI / 180d
+        apoints(index) = (Math.cos(radAngle) * d1).toFloat
+        apoints(index + 1) = (Math.sin(radAngle) * d1).toFloat
+        apoints(index + 3) = (Math.cos(radAngle) * d2).toFloat
+        apoints(index + 4) = (Math.sin(radAngle) * d2).toFloat
+      }
+
+      setPoints(0, 0)
+      for (st <- 0 to steps)
+        setPoints(st * 6, st.toDouble * GraphElem.schrittWeiteKreis)
+      setPoints((steps + 1) * 6, delta)
+
+      /*println("points " + (for (i <- 0 until (steps+2)*2) yield
+        " p" + i + ".x: " + apoints(i * 3) + " .y: " + apoints(i * 3 +1) +
+        " .z: " + apoints(i * 3 +  2) + "\n" ))*/
+      val geom = new MyBufferGeometry()
+
+      val indices = new js.Array[Int]((steps + 1) * 6)
+      var current = 0
+      for (i <- 0 until (steps + 1) * 2; l <- 0 to 2) {
+        indices(current) = if (i % 2 == 0) i + l else i + 2 - l
+        current += 1
+      }
+
+      //println("indices:" + (for (i <- 0 until indices.length) yield indices(i)).mkString(", "))
+      geom.setIndex(indices)
+      geom.addAttribute("position", new BufferAttribute(apoints, 3))
+      geom.computeFaceNormals()
+      geom.computeBoundingSphere()
+      val mesh = new Mesh(geom, GraphElem.getMaterial(color))
+      mesh.position.x = centerPoint.x
+      mesh.position.y = centerPoint.y
+      mesh.rotation.z = startAngle * Math.PI / 180d
+
+      mesh
+    } catch {
+      case e: Throwable => util.Log.e("Arc Geo:", e); null
+    }
+  }
 }
 
 
@@ -154,6 +245,7 @@ object GraphElem {
   val LINETYPE=40
   val ARCTYPE=41
   val NULLRECT: BRect = BRect(0,0,0,0)
+  val schrittWeiteKreis = 11.25d
   def getPointsBounds(points:Seq[VectorConstant]):BRect =
     if(points==null && points.isEmpty) {Log.e("getPointBounds "+points);null}
     else 	{
@@ -170,4 +262,22 @@ object GraphElem {
       }
       BRect(x1,y1,x2,y2)
     }
+
+  val materialCache: mutable.HashMap[Int, MeshBasicMaterial] = collection.mutable.HashMap[Int, MeshBasicMaterial]()
+
+  def getMaterial(color: Int): MeshBasicMaterial = materialCache.getOrElseUpdate(color, {
+    val c = new Color((color / 256 / 256).toDouble / 256d, ((color / 256) % 256).toDouble / 256d, (color % 256).toDouble / 256d)
+    val mat = new MeshBasicMaterial
+    mat.color = c
+    mat.side = THREE.DoubleSide
+    mat
+  })
+
+  val lineGeometry = new PlaneBufferGeometry(1, 1)
+
+  val lineCache: mutable.HashMap[(Double, Double), PlaneBufferGeometry] = collection.mutable.HashMap[(Double, Double), PlaneBufferGeometry]()
+
+  def getLine(length: Double, width: Double): PlaneBufferGeometry = lineCache.getOrElseUpdate((length, width), {
+    new PlaneBufferGeometry(length, width)
+  })
 }

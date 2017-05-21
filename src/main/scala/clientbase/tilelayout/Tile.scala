@@ -1,11 +1,10 @@
 package clientbase.tilelayout
 
-import clientbase.control.SidepanelController
-import definition.data.{Referencable, Reference}
-import org.scalajs.dom.html.{Button, Div, Paragraph}
-import org.scalajs.dom.raw.{HTMLElement, MouseEvent, TouchEvent}
-import org.scalajs.dom.{document, window}
-
+import definition.data.Referencable
+import org.scalajs.dom.html.{ Button, Div, Paragraph }
+import org.scalajs.dom.raw.{ HTMLElement, MouseEvent, TouchEvent }
+import org.scalajs.dom.{ document, window }
+import scala.util.control.NonFatal
 import scalatags.JsDom.all._
 
 /**
@@ -38,7 +37,8 @@ class TestContent(color:String) extends TileContent{
   def init(selection:Iterable[Referencable]):Unit=par.appendChild(p("Selection "+selection.mkString("|")).render)
   lazy val par: Paragraph = p()( "Test "+color).render
   override def load():Unit = {}
-  override val content: Div = div(style:="background-color:"+color+";width:100%;height:100%;font-size:0.5em;")(par).render
+
+  override val content: Div = div(backgroundColor := color, width := "100%", height := "100%", fontSize := "0.5em")(par).render
   override def save():Unit = {}
   //def debug(st:String):Unit = content.appendChild(div(st).render)
   def close():Unit = {}
@@ -60,15 +60,21 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   var proportion=0.5d
   val myDiv: Div = div(`class`:=StyleSingleContent).render
   val rightButtonGroup:Div = div(`class`:="tile-button-group-right").render
-  lazy val slideRight: EdgeSensorRight =new EdgeSensorRight("tile-slide-right",true,
+  /*lazy val slideRight: EdgeSensorRight =new EdgeSensorRight("tile-slide-right",true,
     ()=>{open(createRandomContent,TileKind.Horizontal)},()=>for(p<-getParentTile)
       if(p.kind==TileKind.Horizontal)p.closeChild(this))
   lazy val slideBottom: EdgeSensorRight =new EdgeSensorRight("tile-slide-bottom",false,
     ()=>{open(createRandomContent,TileKind.Vertical)},()=>for(p<-getParentTile)
-      if(p.kind==TileKind.Vertical)p.closeChild(this))
+      if(p.kind==TileKind.Vertical)p.closeChild(this))*/
   val rightButtons: List[Button] =Tile.factoryList map{
     case ContentFactory(symbol,description,callBack) => button(`title`:=description,`class`:=StyleTRButton,onclick:={
-    ()=>open(callBack(),TileKind.Horizontal)})(symbol).render}
+      () => try {
+        open(callBack(), TileKind.Horizontal)
+      } catch {
+        case NonFatal(e) => util.Log.e("open", e)
+      }
+    })(symbol).render
+  }
 
   val closeButton:Button = button(`class`:=StyleTRButton,onclick:=closeMe _)("X").render
   val wideButton:Button=button(`class`:=StyleTRButton,onclick:={
@@ -77,7 +83,13 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   val bottomButtons: List[Button] =Tile.factoryList map{
     case ContentFactory(symbol,description,callBack) =>
       button(`title`:=description,`class`:=StyleBLButton,onclick:={ ()=>
-       {open(callBack(),TileKind.Vertical)}})(symbol).render}
+        try {
+          open(callBack(), TileKind.Vertical)
+        } catch {
+          case NonFatal(e) => util.Log.e("open", e)
+        }
+      })(symbol).render
+  }
   rightButtonGroup.appendChild(closeButton)
   rightButtonGroup.appendChild(wideButton)
   myDiv.appendChild(rightButtonGroup)
@@ -89,7 +101,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     notifyResize()
   }
 
-  def getParentTile=parentTile
+  def getParentTile: Option[Tile] = parentTile
 
   def clearContent():Unit= {
     //println("clear")
@@ -104,12 +116,12 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     if(trVisible) {
       for(b<-rightButtons)
       rightButtonGroup.appendChild(b)
-      myDiv.appendChild(slideRight.myDiv)
+      //myDiv.appendChild(slideRight.myDiv)
     }
     else {
       for(b<-rightButtons)
       if(rightButtonGroup.contains(b)) rightButtonGroup.removeChild(b)
-      if(myDiv.contains(slideRight.myDiv)) myDiv.removeChild(slideRight.myDiv)
+      //if(myDiv.contains(slideRight.myDiv)) myDiv.removeChild(slideRight.myDiv)
     }
   }
 
@@ -117,11 +129,11 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     outerEdgeBottom=visible
     if(visible) {
       for(b<-bottomButtons) bottomButtonGroup.appendChild(b)
-      myDiv.appendChild(slideBottom.myDiv)
+      //myDiv.appendChild(slideBottom.myDiv)
     }
     else {
       for(b<-bottomButtons) if(bottomButtonGroup.contains(b)) bottomButtonGroup.removeChild(b)
-      if(myDiv.contains(slideBottom.myDiv)) myDiv.removeChild(slideBottom.myDiv)
+      //if(myDiv.contains(slideBottom.myDiv)) myDiv.removeChild(slideBottom.myDiv)
     }
     //blButton.style.setProperty("display",if(visible)"initial" else "none")
   }
@@ -193,6 +205,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   }
 
   def open(newContent:TileContent,nkind:TileKind.Value): Unit = if(kind==TileKind.Single) {
+    util.Log.w("Open " + newContent + " " + nkind)
     clearContent()
     kind=nkind
     val ft=new Tile(Some(this))
@@ -225,7 +238,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     updateLayout()
     notifyResize()
     //println("open done "+this+" ft:"+ft+" st:"+st+" r:"+outerEdgeRight+" b:"+outerEdgeBottom)
-  }
+  } else util.Log.e("Cant open " + newContent + " tileKind:" + kind)
 
   protected def takeOver(tile:Tile,fromFirst:Boolean,otherTile:Tile):Unit= {
       kind=tile.kind
@@ -510,8 +523,8 @@ object Tile {
   val StyleHDrag="tile-hdrag"
   val StyleTRButton="tile-tr-button"
   val StyleBLButton="tile-bl-button"
-  var maxRootParentElement:HTMLElement=null
-  var maxDivParentElement:HTMLElement=null
+  var maxRootParentElement: HTMLElement = _
+  var maxDivParentElement: HTMLElement = _
   var maxWidthStyle:String=""
   var maxHeightStyle:String=""
 

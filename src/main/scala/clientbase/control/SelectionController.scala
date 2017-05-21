@@ -1,8 +1,8 @@
 package clientbase.control
 
+import clientbase.connection.WebSocketConnector
 import definition.data.Referencable
-import definition.typ.{AbstractObjectClass, SelectGroup, AllClasses}
-
+import definition.typ.{ AbstractObjectClass, AllClasses, SelectGroup }
 import scala.collection.mutable
 
 /**
@@ -18,39 +18,36 @@ object SelectionController {
 
   var commonClass:Option[AbstractObjectClass]=None
 
-  lazy val supportsTouch=org.scalajs.dom.window.hasOwnProperty("ontouchstart")
+  lazy val supportsTouch: Boolean = org.scalajs.dom.window.hasOwnProperty("ontouchstart")
 
-  def setFocusedElement(owner:FocusOwner)=if(focusedElement.isEmpty||focusedElement.get!=owner){
+  def setFocusedElement(owner: FocusOwner): Unit = if (focusedElement.isEmpty || focusedElement.get != owner) {
     for(f<-focusedElement)f.blur()
     focusedElement=Some(owner)
   }
 
-  def select(selection:Iterable[SelectGroup[_ <: Referencable]])={
-    cellEditor.finishEdit(0,false)
+  def select(selection: Iterable[SelectGroup[_ <: Referencable]]): Unit = {
+    cellEditor.finishEdit(0, focusTable = false)
     currentSelection=selection
     val commonClassID=AllClasses.get.getCommonClassForGroups(selection)
     commonClass= if(commonClassID>0 ) Some(AllClasses.get.getClassByID(commonClassID)) else None
     notifySelectionChanged()
   }
 
-  def deselect()= {
-    cellEditor.finishEdit(0,false)
+  def deselect(): Unit = {
+    cellEditor.finishEdit(0, focusTable = false)
     currentSelection=Seq.empty
     commonClass=None
     notifySelectionChanged()
   }
 
-  def notifySelectionChanged()= {
+  def notifySelectionChanged(): Unit = if (WebSocketConnector.editable) {
     val numElems=currentSelection.foldLeft(0)((sum,el)=>sum+el.children.size)
-
     commonClass match {
-      case Some(c)=> {
-        SidepanelController.setSelection(""+numElems+" "+c.getDescriptionOrName+(if(numElems==1)" -Objekt" else " -Objekte"), c.actions )
-      }
+      case Some(c) => SidepanelController.setSelection("" + numElems + " " +
+        c.getDescriptionOrName + (if (numElems == 1) " -Objekt" else " -Objekte"), c.actions)
       case None => SidepanelController.setSelection(" - ",mutable.LinkedHashMap.empty)
     }
-
   }
 
-  def printMessage(text:String)= SidepanelController.messageLabel.innerHTML=text
+  def printMessage(text: String): Unit = SidepanelController.messageLabel.innerHTML = text
 }

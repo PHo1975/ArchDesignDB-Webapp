@@ -1,11 +1,9 @@
 package clientbase.control
 
-import java.util
-
+import clientbase.connection.WebSocketConnector
 import definition.typ.ActionTrait
 import org.scalajs.dom.html._
-import org.scalajs.dom.raw.{HTMLElement, MouseEvent, Node}
-
+import org.scalajs.dom.raw.{ HTMLElement, MouseEvent }
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scalatags.JsDom.all._
@@ -21,31 +19,37 @@ object SidepanelController {
   val openCTag="contentopen"
   val closeCTag="contentclosed"
 
-  val switchListener=ArrayBuffer[()=>Unit]()
+  val switchListener: ArrayBuffer[() ⇒ Unit] = ArrayBuffer[() => Unit]()
 
   val switchButton: Button =button(id:="switchbut",tabindex:= -1)("\u2261").render
   var open=false
-  val selCheck: Input =input(`type`:="checkbox" ,id:="multiSelectCheck",style:="float:right;").render
+  val selCheck: Input = input(`type` := "checkbox", id := "multiSelectCheck", float := "right").render
   selCheck.onclick=(e:MouseEvent)=>{multiSelectMode=selCheck.checked}
-  val selectionHeader: Div =div(label(`class`:="label",style:="float:left;")("Auswahl:  "),selCheck,label(`class`:="label",`for`:="multiSelectCheck",style:="float:right;")("mehrfach")).render
-  val selectionLabel: Span = span(`class`:="label",style:="width:100%;background-color:#f6f6f6;float:left;")(" - ").render
+  val selectionHeader: Div = div(label(`class` := "label", float := "left")("Auswahl:  "), selCheck, label(`class` := "label", `for` := "multiSelectCheck", float := "right")("mehrfach")).render
+  val selectionLabel: Span = span(`class` := "label", width := "100%", backgroundColor := "#f6f6f6", float := "left")(" - ").render
   val selectionArea: Div =div(`class`:="sidepanelpart")(selectionHeader,selectionLabel).render
-  val actionLabel: Label = label(`class`:="label",style:="float:left;")("Aktionen:").render
+  val actionLabel: Label = label(`class` := "label", float := "left")("Aktionen:").render
   val actionArea: Div =div(`class`:="sidepanelpart",id:="action")(actionLabel).render
 
   var currentActions:mutable.LinkedHashMap[String,ActionTrait]=mutable.LinkedHashMap.empty
   val messageLabel: Paragraph =p(`class`:="label")("-").render
   var multiSelectMode=false
 
-  def setup(nsidePanelRoot:HTMLElement,ncontentRoot:HTMLElement): Node = {
+  def setup(nsidePanelRoot: HTMLElement, ncontentRoot: HTMLElement): Unit = {
     sidePanelRoot=nsidePanelRoot
     contentRoot=ncontentRoot
-    sidePanelRoot.appendChild(switchButton)
+    if (WebSocketConnector.editable) sidePanelRoot.appendChild(switchButton)
+    else {
+      sidePanelRoot.style.width = "0"
+      contentRoot.style.marginLeft = "0"
+      contentRoot.style.width = "100%"
+    }
+
   }
 
-  def notifySwitchListeners()=  for(s<-switchListener) s()
+  def notifySwitchListeners(): Unit = for (s <- switchListener) s()
 
-  def doOpen(): Unit ={
+  def doOpen(): Unit = if (WebSocketConnector.editable) {
     sidePanelRoot.classList.remove(closeTag)
     contentRoot.classList.remove(closeCTag)
     sidePanelRoot.classList.add(openTag)
@@ -54,7 +58,7 @@ object SidepanelController {
     notifySwitchListeners()
   }
 
-  def doClose(): Unit ={
+  def doClose(): Unit = if (WebSocketConnector.editable) {
     sidePanelRoot.classList.remove(openTag)
     contentRoot.classList.remove(openCTag)
     sidePanelRoot.classList.add(closeTag)
@@ -80,7 +84,7 @@ object SidepanelController {
     open= !open
   }}
 
-  def setSelection(text:String,actions:mutable.LinkedHashMap[String,ActionTrait])={
+  def setSelection(text: String, actions: mutable.LinkedHashMap[String, ActionTrait]): Unit = {
     //println("set selection "+text+" actions:"+actions.size)
     if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
     if (open && !sidePanelRoot.contains(actionArea)) sidePanelRoot.appendChild(actionArea)
@@ -96,10 +100,11 @@ object SidepanelController {
     actionArea.appendChild(messageLabel)
   }
 
-  def printMessage(st:String)=messageLabel.innerHTML=st
-  def addMessage(st:String)= messageLabel.innerHTML=messageLabel.innerHTML+"<br>"+st
+  def printMessage(st: String): Unit = messageLabel.innerHTML = st
 
-  def showAnswerPanel()={
+  def addMessage(st: String): Unit = messageLabel.innerHTML = messageLabel.innerHTML + "<br>" + st
+
+  def showAnswerPanel(): Unit = {
     doOpen()
     if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
     sidePanelRoot.appendChild(DialogManager.answerController.panel)
