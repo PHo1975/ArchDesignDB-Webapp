@@ -15,7 +15,6 @@ class LayerListPan(controller: Viewer2DController) {
   val pane: Div = div(`class` := "layerlistpan")(layerTab).render
 
   def addLayer(newLayer: LayerSubscriber): Unit = {
-
     layerTab.appendChild(newLayer.row)
   }
 

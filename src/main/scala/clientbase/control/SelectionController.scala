@@ -1,6 +1,7 @@
 package clientbase.control
 
 import clientbase.connection.WebSocketConnector
+import clientbase.viewer2d.SelectionDecorable
 import definition.data.Referencable
 import definition.typ.{ AbstractObjectClass, AllClasses, SelectGroup }
 import scala.collection.mutable
@@ -27,14 +28,30 @@ object SelectionController {
 
   def select(selection: Iterable[SelectGroup[_ <: Referencable]]): Unit = {
     cellEditor.finishEdit(0, focusTable = false)
+    resetOldSelection()
     currentSelection=selection
+    decorateNewSelection()
     val commonClassID=AllClasses.get.getCommonClassForGroups(selection)
     commonClass= if(commonClassID>0 ) Some(AllClasses.get.getClassByID(commonClassID)) else None
     notifySelectionChanged()
   }
 
+  def resetOldSelection(): Unit =
+    for (cgroup ← currentSelection; elem ← cgroup.children) elem match {
+      case dec: SelectionDecorable ⇒ dec.hideSelection()
+      case _ ⇒
+    }
+
+  def decorateNewSelection(): Unit =
+    for (cgroup ← currentSelection; elem ← cgroup.children) elem match {
+      case dec: SelectionDecorable ⇒ dec.showSelection()
+      case _ ⇒
+    }
+
+
   def deselect(): Unit = {
     cellEditor.finishEdit(0, focusTable = false)
+    resetOldSelection()
     currentSelection=Seq.empty
     commonClass=None
     notifySelectionChanged()

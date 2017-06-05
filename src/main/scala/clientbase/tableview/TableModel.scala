@@ -6,9 +6,9 @@ import clientbase.control._
 import definition.data.{ EMPTY_OWNERREF, InstanceData, OwnerReference, Reference }
 import definition.expression._
 import definition.typ.DataType._
-import definition.typ.{ AllClasses, DataType, FieldSetting, SelectGroup }
+import definition.typ._
 import org.scalajs.dom
-import org.scalajs.dom.html.{ TableCell, TableHeaderCell, TableRow }
+import org.scalajs.dom.html.{ Table, TableCell, TableHeaderCell, TableRow }
 import org.scalajs.dom.raw._
 import util.{ Log, StrToInt }
 import scala.collection.mutable.ArrayBuffer
@@ -23,10 +23,10 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
   var dragIx:Int= -1
   protected val data=new ArrayBuffer[InstanceData]()
-  protected val myClass=AllClasses.get.getClassByID(typ)
+  protected val myClass: AbstractObjectClass = AllClasses.get.getClassByID(typ)
   protected var tableSettings=TableSettings.getColumnData(typ)
-  protected val numCols=if(tableSettings.isEmpty) myClass.fields.size else tableSettings.count(s => myClass.fieldSetting(s.ix).visible)
-  protected val myTable=  table(createHeader).render
+  protected val numCols: Int = if (tableSettings.isEmpty) myClass.fields.size else tableSettings.count(s => myClass.fieldSetting(s.ix).visible)
+  protected val myTable: Table = table(createHeader).render
 
   var selection:Set[Int]=Set.empty
   val selectionGroup=new SelectGroup[Reference](EMPTY_OWNERREF,Seq.empty)
@@ -301,7 +301,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
   def startEditMode():Unit= {
     //println("start edit "+focusedRow)
-    if(SelectionController.cellEditor.isEditing)SelectionController.cellEditor.finishEdit(0,false)
+    if (SelectionController.cellEditor.isEditing) SelectionController.cellEditor.finishEdit(0, focusTable = false)
     val fieldIx = tableSettings(focusedCol).ix
     var instRef:Option[Reference]=None
     val text=if(focusedRow>data.size-1) "" else {
@@ -313,7 +313,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       }
     }
     val parent=myTable.childNodes.item(focusedRow+1).childNodes.item(focusedCol+1)
-    SelectionController.cellEditor.startEdit(text,parent,(newText,dir)=>{
+    SelectionController.cellEditor.startEdit(text, parent, (newText, _) => {
       if(instRef.isEmpty) {
         WebSocketConnector.createInstance(typ,Array(new OwnerReference(propertyModel.propField,propertyModel.topRef)),const=>{
           writeField(new Reference(typ,const.toInt),fieldIx,newText)
@@ -327,7 +327,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     StringParser.parse(newText) match {
       case ex:Expression=>WebSocketConnector.writeInstanceField(ref,fieldIx,ex)
       case error:ParserError=> if(myClass.fields(fieldIx).typ==DataType.StringTyp)
-        WebSocketConnector.writeInstanceField(ref,fieldIx,new StringConstant(newText))
+                                 WebSocketConnector.writeInstanceField(ref, fieldIx, StringConstant(newText))
       else dom.window.alert("Fehler: "+error.message)
     }
     focusCell(focusedCol,focusedRow,notify=false)

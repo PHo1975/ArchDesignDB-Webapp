@@ -310,6 +310,8 @@ flex-direction:column;
   image-rendering: optimize-contrast;
   cursor:none;
   overflow:hidden;
+  margin:0;
+  padding:0;
 }
 
 .crosshairdivs{

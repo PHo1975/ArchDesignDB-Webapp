@@ -1,14 +1,18 @@
 package clientbase.viewer2d
 
+import java.io.DataInput
 import clientbase.connection.WebSocketConnector
 import clientbase.localstore.{ SingleInstanceSubs, SubsMap }
-import definition.data.{ InstanceData, Reference }
+import definition.data.{ InstanceData, OwnerReference, Reference }
 import definition.expression.Expression
+import definition.typ.SelectGroup
 import org.scalajs.dom.html.{ Button, Image, TableCell, TableRow }
 import org.scalajs.dom.raw.MouseEvent
 import util.Log
+import scala.scalajs.js
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
+
 
 /**
   * Created by Peter Holzer on 11.02.2017.
@@ -20,7 +24,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
   val numCell: TableCell = td().render
   val scaleCell: TableCell = td().render
   val eyeIcon: TableCell = td(onclick := { (_: MouseEvent) => toggleVisibility() })(img(src := "eye.gif")).render
-  val editIcon: TableCell = td(img(src := "editsmall.gif")).render
+  val editIcon: TableCell = td(onclick := { (_: MouseEvent) => toggleEditable() })(img(src := "editsmall.gif")).render
   val newElemIcon: Image = img(src := "newElem.gif").render
   val newElemPlace: TableCell = td().render
   val removeBut: Button = button(onclick := { (_: MouseEvent) => {
@@ -36,6 +40,8 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     nameCell.innerHTML = inst.fieldValue(1).toString
     scaleCell.innerHTML = controller.scaleToString(ScaleModel.scales.getOrElse(inst.fieldValue(2).toInt, 0d))
   })
+
+  lazy val ownerReference = new OwnerReference(0.toByte, layerRef)
 
   override def factory(in: DataInput): GraphElem = try {
       val ref = Reference(in)
@@ -68,6 +74,23 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
           ArcElement(ref, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, diameter, startA, endA)
+
+        case GraphElem.ELLIPSETYP ⇒
+          val nfields = in.readByte
+          if (nfields != 9) util.Log.e("Ellipse wrong number of fields " + nfields + " " + ref)
+          val color = Expression.read(in).getValue
+          val lineWidth = Expression.read(in).getValue
+          val lineStyle = Expression.read(in).getValue
+          val centerPoint = Expression.read(in).getValue.toVector
+          val r1 = Expression.read(in).getValue.toDouble
+          val r2 = Expression.read(in).getValue.toDouble
+          val mainAngle = Expression.read(in).getValue.toDouble
+          val startA = Expression.read(in).getValue.toDouble
+          val endA = Expression.read(in).getValue.toDouble
+          val owners = InstanceData.readOwners(in)
+          InstanceData.readSecondUseOwners(in)
+          in.readBoolean
+          EllipseElement(ref, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, r1, r2, mainAngle, startA, endA)
 
         case _ => InstanceData.readWithChildInfo(ref, in); new GraphElemStub(ref)
       }
@@ -123,9 +146,10 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     BRect(x1,y1,x2,y2)
   }
 
-  def toggleVisibility(): Unit = {
-    if (visible) hide() else show()
-  }
+  def toggleVisibility(): Unit = controller.layerList.toggleVisibility(this)
+
+  def toggleEditable(): Unit = controller.layerList.toggleEditable(this)
+
 
   def show(): Unit = if (!visible && subsID == -1) {
     //println("show "+layerRef)
@@ -145,6 +169,23 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     controller.canvasHandler.repaint()
     eyeIcon.style.background = "white"
     visible = false
+    setEditable(false)
+  }
+
+  def setEditable(edit: Boolean): Unit = {
+    editable = edit
+    editIcon.style.background = if (edit) "blue" else "white"
+  }
+
+  def setActive(act: Boolean): Unit = {
+    newElemIcon.style.background = if (act) "blue" else "white"
+  }
+
+  def filterSelection(intersection: js.Array[Reference]): Option[SelectGroup[GraphElem]] = {
+    val elemsInLayer: js.Array[GraphElem] = intersection.filter(map.contains).map(map)
+    println("layer " + layerRef + " elems:" + elemsInLayer.mkString(" ,"))
+    if (elemsInLayer.length == 0) None
+    else Some(SelectGroup(ownerReference, elemsInLayer))
   }
 
 }

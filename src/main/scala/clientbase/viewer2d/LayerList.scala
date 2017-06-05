@@ -1,8 +1,10 @@
 package clientbase.viewer2d
 
-import definition.data.Referencable
+import definition.data.{ Referencable, Reference }
+import definition.typ.SelectGroup
 import util.Log
 import scala.collection.mutable.ArrayBuffer
+import scala.scalajs.js
 
 /**
   * Created by Peter Holzer on 11.02.2017.
@@ -11,6 +13,8 @@ class LayerList(controller:Viewer2DController) {
 
   val subscriberList: ArrayBuffer[LayerSubscriber] =ArrayBuffer[LayerSubscriber]()
   var loaded=false
+
+  var activeLayer: Option[LayerSubscriber] = None
 
   def loadLayers(nlist:Iterable[Referencable ]):Unit= {
     shutDown()
@@ -37,6 +41,35 @@ class LayerList(controller:Viewer2DController) {
     }
   }
 
+  def setActiveLayer(lay: LayerSubscriber): Unit = {
+    activeLayer = Some(lay)
+    lay.show()
+    lay.setEditable(true)
+    lay.setActive(true)
+  }
+
+  def toggleVisibility(lay: LayerSubscriber): Unit = {
+    if (lay.visible) {
+      lay.hide()
+      for (f ← activeLayer; if f == lay) {
+        f.setActive(false)
+        activeLayer = None
+      }
+    } else lay.show()
+  }
+
+  def toggleEditable(lay: LayerSubscriber): Unit = {
+    if (lay.editable)
+      for (f ← activeLayer; if f == lay) {
+        f.setActive(false)
+        activeLayer = None
+      }
+    lay.setEditable(!lay.editable)
+  }
+
+  def editableLayers: Iterator[LayerSubscriber] = subscriberList.iterator.filter(_.editable)
+
+
   def calcBounds(): BRect ={
     //println("Calcbounds "+subscriberList.size)
     var x1=Double.MaxValue
@@ -57,8 +90,7 @@ class LayerList(controller:Viewer2DController) {
   def readyLoaded():Unit={
     //println("list ready loaded " +subscriberList.size)
     loaded=true
-    if (subscriberList.nonEmpty)
-      subscriberList.head.show()
+    for (l ← subscriberList.headOption) setActiveLayer(l)
     controller.readyLoaded()
   }
 
@@ -77,6 +109,9 @@ class LayerList(controller:Viewer2DController) {
         controller.layerPan.removeLayer(ix)
     }
   }
+
+  def decodeSelection(intersection: js.Array[Reference]): Seq[SelectGroup[_ <: Referencable]] =
+    editableLayers.flatMap(_.filterSelection(intersection)).toSeq
 
 
 }

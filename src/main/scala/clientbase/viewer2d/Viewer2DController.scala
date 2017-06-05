@@ -9,6 +9,15 @@ import util.Log
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
 
+object ControllerState extends Enumeration {
+  val SelectElems = Value("Select")
+  val AskPoint = Value("AskPoint")
+  val AskObject = Value("Chose")
+  val AskPointOrObject = Value("PointOrObject")
+  val InPlaceEdit = Value("InPlaceEdit")
+  val SelectPoints = Value("SelectPoints")
+  val DragDrop = Value("DragDrop")
+}
 
 /**
   * Created by Peter Holzer on 11.02.2017.
@@ -26,17 +35,19 @@ class Viewer2DController extends TileContent with ElemContainer {
   val layerList=new LayerList(this)
   val scaleModel=new ScaleModel
   val scaleSelect: Select = select(`class` := "scales-combo").render
-  val canvasHolder: Div = div(`class` := "viewer2dcanvas").render
   val horCross: Div = div(`class`:="crosshairdivs").render
   val vertCross: Div = div(`class`:="crosshairdivs").render
+  val canvasHolder: Div = div(`class` := "viewer2dcanvas")(horCross, vertCross).render
   Log.w("create Viewer ")
 
   override val content: HTMLElement = div(`class`:="viewer2dcontent")(
     layerPan.pane,
     div(`class` := "viewer2dbuttonbar")(layerListBut, zoomAllBut, if (SelectionController.supportsTouch) div() else scaleSelect),
-    canvasHolder, horCross, vertCross).render
+    canvasHolder).render
 
   val canvasHandler = new Viewer2DCanvas(this, canvasHolder, horCross, vertCross, scaleModel)
+  var controllerState: ControllerState.Value = ControllerState.SelectElems
+  //var movetime:Long=0
 
   for ((id, sc) <- ScaleModel.scales) scaleSelect.appendChild(option(attr("sid") := id.toString)(scaleToString(sc)).render)
   scaleSelect.onchange = (e: Event) => {
@@ -44,9 +55,7 @@ class Viewer2DController extends TileContent with ElemContainer {
       case -1 =>
       case ix => ScaleModel.scales(ix)
     }
-
   }
-
 
   def scaleRatio:Double= scaleModel.relativeScaleValue
 
@@ -105,5 +114,24 @@ class Viewer2DController extends TileContent with ElemContainer {
   def setActiveLayerScale(scaleID: Int): Unit = {
 
   }
+
+  // Interaction
+
+  def mouseClicked(button: MouseButtons.Value, screenx: Double, screeny: Double, controlKey: Boolean): Unit =
+    button match {
+      case MouseButtons.LEFT ⇒
+        controllerState match {
+          case ControllerState.SelectElems ⇒
+            val elems = canvasHandler.pickElems(screenx, screeny)
+            println("elems:" + elems.mkString(", "))
+            val newSelection = layerList.decodeSelection(elems)
+            println("new selection:" + newSelection.mkString(", "))
+            SelectionController.select(newSelection)
+            dataUpdated()
+          case _ ⇒
+        }
+      case _ ⇒
+    }
+
 
 }
