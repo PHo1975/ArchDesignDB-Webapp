@@ -1,16 +1,18 @@
 package clientbase.tableview
 
 
-import clientbase.connection.{ TableSettings, WebSocketConnector }
+import clientbase.connection.{ColumnInfo, TableSettings, WebSocketConnector}
 import clientbase.control._
-import definition.data.{ EMPTY_OWNERREF, InstanceData, OwnerReference, Reference }
+import definition.data.{EMPTY_OWNERREF, InstanceData, OwnerReference, Reference}
 import definition.expression._
 import definition.typ.DataType._
 import definition.typ._
 import org.scalajs.dom
-import org.scalajs.dom.html.{ Table, TableCell, TableHeaderCell, TableRow }
+import org.scalajs.dom.html.{Table, TableCell, TableHeaderCell, TableRow}
 import org.scalajs.dom.raw._
-import util.{ Log, StrToInt }
+import util.{Log, StrToInt}
+
+import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
@@ -24,11 +26,11 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
   var dragIx:Int= -1
   protected val data=new ArrayBuffer[InstanceData]()
   protected val myClass: AbstractObjectClass = AllClasses.get.getClassByID(typ)
-  protected var tableSettings=TableSettings.getColumnData(typ)
+  protected var tableSettings: Seq[ColumnInfo] =TableSettings.getColumnData(typ)
   protected val numCols: Int = if (tableSettings.isEmpty) myClass.fields.size else tableSettings.count(s => myClass.fieldSetting(s.ix).visible)
   protected val myTable: Table = table(createHeader).render
 
-  var selection:Set[Int]=Set.empty
+  var selection:TreeSet[Int]=TreeSet.empty
   val selectionGroup=new SelectGroup[Reference](EMPTY_OWNERREF,Seq.empty)
 
   val selectionGroupList=List(selectionGroup)
@@ -79,7 +81,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     val cell=th(draggable:="true",ixAttr:=ix.toString)(name).render
 
     cell.ondragstart= handleDragStart _
-    cell.ondragend=(event:DragEvent)=>{
+    cell.ondragend=(_:DragEvent)=>{
       cell.style.setProperty("opacity","1")
     }
     cell.ondragover=(event:DragEvent)=> {
@@ -87,8 +89,8 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       if(!cell.classList.contains("over"))cell.classList.add("over")
       }
 
-    cell.ondragenter=(event:DragEvent)=> {cell.classList.add("over")}
-    cell.ondragleave=(event:DragEvent)=> {cell.classList.remove("over")}
+    cell.ondragenter=(_:DragEvent)=> {cell.classList.add("over")}
+    cell.ondragleave=(_:DragEvent)=> {cell.classList.remove("over")}
     cell.ondrop=(event:DragEvent)=> {
       event.stopPropagation()
       cell.classList.remove("over")
@@ -120,7 +122,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       row+=1
     }
     if(!singleField)myTable.appendChild(lastRow)
-    selection=Set.empty
+    selection=TreeSet.empty
     focusedRow=0
     focusedCol=0
     createdRow=None
@@ -173,7 +175,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
    val lastRow: TableRow =tr(td(`class`:="firstcol"),for(ix<-tableSettings.indices) yield {
       val cell=td(tabindex:="-1")(div(`class`:="inner")(" ")).render
-     cell.onclick = (e: MouseEvent) => {
+     cell.onclick = (_: MouseEvent) => {
         focusedCol=ix
         focusedRow=data.size
         SelectionController.deselect()
@@ -248,7 +250,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     val inner=div(`class`:="inner")(st).render
     val cell=td(tabindex:="-1")(inner).render
 
-    def onClicked(control: Boolean, shift: Boolean) = {
+    def onClicked(control: Boolean, shift: Boolean): Unit = {
       cell.focus()
       SelectionController.setFocusedElement(this)
       focusCellClicked(colIx,row,control,shift)
@@ -287,7 +289,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
       }
     }
     longTouch.setup()
-    cell.onfocus=(e:FocusEvent)=>{
+    cell.onfocus=(_:FocusEvent)=>{
       if(!SidepanelController.multiSelectMode || !longTouch.timerUsed)
       onClicked(controlDown,shiftDown)
     }
@@ -361,14 +363,15 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
   }
 
   def blur():Unit={
-    selection=Set.empty
+    selection=TreeSet.empty
     clearSelectStyle()
   }
 
   // selection
 
   protected def notifySelection():Unit={
-    selectionGroup.children= for(s<-selection; if s<data.size) yield data(s).ref
+    selectionGroup.children= (for(s<-selection.iterator; if s<data.size) yield data(s).ref).toSeq
+    println("notify:"+selection.mkString(",")+"  "+selectionGroup.children.map(_.ref).mkString(","))
     SelectionController.select(selectionGroupList)
   }
 
@@ -377,7 +380,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     val myStart=math.min(start,end)
     val myEnd=math.max(start,end)
     val range=myStart to myEnd
-    selection=range.toSet
+    selection= new TreeSet[Int] ++range
     //SidepanelController.addMessage("range "+range)
     for(pos <-range) addSelectStyle(pos)
     notifySelection()

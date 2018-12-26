@@ -10,15 +10,15 @@ import scala.collection.immutable.SortedMap
   * Created by Peter Holzer on 11.02.2017.
   */
 object ScaleModel {
-  var _dotPitch: Double = 0.25d
+  val _dotPitch: Double = 0.25d
   // display resolution in mm/pix
   var scales: Map[Int, Double] = Map.empty
 
 
   private val cl =AllClasses.get.getClassByID(GraphElem.LAYERTYPE).asInstanceOf[WebObjectClass]
-  println("Scale " +cl.enumFields.values.mkString("|")+" size:"+cl.enumFields.size)
+  //println("Scale " +cl.enumFields.values.mkString("|")+" size:"+cl.enumFields.size)
   if(cl.enumFields.values.nonEmpty)
-  scales= SortedMap(cl.enumFields.values.head.enumValues.map((v)=>(v._2,ScaleModel.stringToScale(v._1))).toSeq :_*)
+  scales= SortedMap(cl.enumFields.values.head.enumValues.map(v=>(v._2,ScaleModel.stringToScale(v._1))).toSeq :_*)
   else println("could not init scales !")
 
   def stringToScale(st: String): Double = {
@@ -52,7 +52,7 @@ class ScaleModel extends Scaler {
 
   def dotPitch: Double =ScaleModel._dotPitch
 
-  var vpBorder = 10 // border of the Canvas
+  val vpBorder = 10 // border of the Canvas
 
   private var _viewSizeX = 1
   // size of the ViewPort component
@@ -77,7 +77,7 @@ class ScaleModel extends Scaler {
   protected var wbx2: Double = 0
   protected var wby2: Double = 0
 
-  protected var _relativeScale: Tuple2[Double, Double] = (1d, 100d)
+  protected var _relativeScale: (Double, Double) = (1d, 100d)
   protected var _thicknessScale = 1d
   var colorsFixed = true // Color==Pen coupling
 

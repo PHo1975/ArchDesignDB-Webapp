@@ -2,20 +2,20 @@ package clientbase.page
 
 import clientbase.connection.WebSocketConnector
 import clientbase.control.SidepanelController
-import clientbase.tilelayout.{ ContentFactory, Tile }
-import clientbase.viewer2d.Viewer2DController
+import clientbase.tilelayout.{ContentFactory, Tile}
+import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, Viewer2DController}
 import org.scalajs.dom.document
 import org.scalajs.dom.raw.HTMLElement
 import util.Log
-import scala.scalajs.js.JSApp
+
 import scala.util.control.NonFatal
 
 
 /**
  * Created by Peter Holzer on 05.04.2015.
  */
-object Main extends JSApp {
-  override def main(): Unit = {
+object Main {
+  def main(args: Array[String]): Unit = {
     //println("main ready "+window.location.href+"|"+window.location.pathname)
 
     try {
@@ -24,6 +24,11 @@ object Main extends JSApp {
       val statusLine = document.getElementById("statusline").asInstanceOf[HTMLElement]
       statusLine.innerHTML = "2"
       WebSocketConnector.start("WebTab", () => {
+        println("startup")
+        GraphSettingsHandler.setup()
+        println("setup")
+        DimLineStyleHandler.init()
+        println("init")
         document.body.removeChild(statusLine)
         val sidepanelRoot = document.getElementById("sidepanel").asInstanceOf[HTMLElement]
         SidepanelController.setup(sidepanelRoot, mainPanel)
@@ -32,7 +37,7 @@ object Main extends JSApp {
         val topContent = new TableContent
         val topTile = new Tile(None, true)
         SidepanelController.switchListener += (()=>{topTile.notifyResize()})
-        topTile.setSingleContent(topContent)
+        topTile.setContent(topContent)
         topTile.setEdgeBottom(true)
         topTile.setEdgeRight(true)
         mainPanel.appendChild(topTile.myDiv)
@@ -48,6 +53,4 @@ object Main extends JSApp {
       case NonFatal(e) => println(e);Log.e(e)
     }
   }
-
-
 }

@@ -1,12 +1,14 @@
 package clientbase.viewer2d
 
 import clientbase.control.SelectionController
-import definition.data.{ EMPTY_REFERENCE, Reference }
+import definition.data.{EMPTY_REFERENCE, Reference}
 import org.denigma.threejs._
 import org.scalajs.dom
+import org.scalajs.dom._
 import org.scalajs.dom.html.Div
-import org.scalajs.dom.raw._
-import util.{ Log, StrToInt }
+import org.scalajs.dom.raw.{ClientRect, HTMLElement}
+import util.{Log, StrToInt}
+
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.util.matching.Regex
@@ -27,7 +29,7 @@ object MouseButtons extends Enumeration {
 class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLElement, vertCross: HTMLElement,
                      scaleModel: ScaleModel) {
   final val tresh = 2
-  val IntersectPattern: Regex = "([CEL])(\\d+)".r
+  val IntersectPattern: Regex = "([CELTD])(\\d+)".r
   var isPainting=false
   var downButtons:Int=0
   var downX:Double=0
@@ -101,14 +103,15 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   }
 
   canv.appendChild(renderer.domElement)
+
   renderer.setClearColor(whiteColor, 0.4d)
   camera.position.z = 30
-  dom.window.addEventListener("resize", (e: Event) => onResize())
+  dom.window.addEventListener("resize", (_: Event) => onResize())
   scaleModel.registerScaleListener(() => adjustCamera())
   canv.addEventListener("contextmenu", contextListener, useCapture = false)
   horCross.addEventListener("contextmenu", contextListener, useCapture = false)
   vertCross.addEventListener("contextmenu", contextListener, useCapture = false)
-  canv.addEventListener("mouseenter", (e: MouseEvent) => {
+  canv.addEventListener("mouseenter", (_: MouseEvent) => {
     if (!SelectionController.supportsTouch) {
       horCross.style.visibility = "visible"
       vertCross.style.visibility = "visible"
@@ -242,7 +245,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     e.preventDefault()
   })
 
-  val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (e: TouchEvent) => {
+  val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (_: TouchEvent) => {
     //oldTouches.clear()
   }
 
@@ -304,7 +307,6 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
 
   def repaint():Unit = if(!isPainting) {
     isPainting=true
-
     try {
       //val before=System.currentTimeMillis()
       renderer.render(scene, camera)
@@ -320,19 +322,17 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     pickVector.x = ((screenX - viewBonds.left) / viewBonds.width) * 2d - 1d
     pickVector.y = 1d - ((screenY - viewBonds.top) / viewBonds.height) * 2d
     raycaster.setFromCamera(pickVector, camera)
+    println("Raycaster line:"+raycaster.linePrecision)
     val intersects = raycaster.intersectObjects(scene.children)
     for (el ← intersects) yield el.`object`.name match {
       case IntersectPattern(typString, StrToInt(inst)) ⇒
-        /*el.`object` match {
-          case me:Mesh ⇒me.material match {
 
-          }
-          case _ ⇒
-        }*/
         val typ = typString match {
           case "L" ⇒ GraphElem.LINETYPE
           case "C" ⇒ GraphElem.ARCTYPE
           case "E" ⇒ GraphElem.ELLIPSETYP
+          case "T" => GraphElem.TEXTTYP
+          case "D" => GraphElem.DIMLINETYP
           case o ⇒ Log.e("Unknown ElemTyp:" + o); 0
         }
         Reference(typ, inst)

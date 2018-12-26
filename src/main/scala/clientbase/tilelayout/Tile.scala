@@ -1,9 +1,11 @@
 package clientbase.tilelayout
 
 import definition.data.Referencable
-import org.scalajs.dom.html.{ Button, Div, Paragraph }
-import org.scalajs.dom.raw.{ HTMLElement, MouseEvent, TouchEvent }
-import org.scalajs.dom.{ document, window }
+import org.scalajs.dom.html.{Button, Div, Paragraph}
+import org.scalajs.dom.raw.{HTMLElement, MouseEvent, TouchEvent}
+import org.scalajs.dom.{document, window}
+import util.Log
+
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
 
@@ -14,11 +16,6 @@ import scalatags.JsDom.all._
 object TileKind extends Enumeration {
   val Single,Horizontal,Vertical=Value
 }
-
-/*trait TileHolder{
-  def replaceTile(oldTile:Tile,newTile:Tile):Unit
-  def deleteTile(tile:Tile):Unit
-}*/
 
 
 trait TileContent{
@@ -32,21 +29,9 @@ trait TileContent{
   def updateResize():Unit={}
 }
 
-class TestContent(color:String) extends TileContent{
-
-  def init(selection:Iterable[Referencable]):Unit=par.appendChild(p("Selection "+selection.mkString("|")).render)
-  lazy val par: Paragraph = p()( "Test "+color).render
-  override def load():Unit = {}
-
-  override val content: Div = div(backgroundColor := color, width := "100%", height := "100%", fontSize := "0.5em")(par).render
-  override def save():Unit = {}
-  //def debug(st:String):Unit = content.appendChild(div(st).render)
-  def close():Unit = {}
-  def getSelection:Iterable[Referencable]=Seq.empty
-}
 
 
-class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
+class Tile(nparentTile:Option[Tile]=None, val isTop:Boolean=false) {
   import Tile._
   var parentTile: Option[Tile] =nparentTile
   var kind:TileKind.Value=TileKind.Single
@@ -56,27 +41,21 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   var firstTile:Option[Tile]=None
   var secondTile:Option[Tile]=None
   var dragArea:Option[Div]=None
-  var singleContent:Option[TileContent]=None
+  var content:Option[TileContent]=None
   var proportion=0.5d
   val myDiv: Div = div(`class`:=StyleSingleContent).render
   val rightButtonGroup:Div = div(`class`:="tile-button-group-right").render
-  /*lazy val slideRight: EdgeSensorRight =new EdgeSensorRight("tile-slide-right",true,
-    ()=>{open(createRandomContent,TileKind.Horizontal)},()=>for(p<-getParentTile)
-      if(p.kind==TileKind.Horizontal)p.closeChild(this))
-  lazy val slideBottom: EdgeSensorRight =new EdgeSensorRight("tile-slide-bottom",false,
-    ()=>{open(createRandomContent,TileKind.Vertical)},()=>for(p<-getParentTile)
-      if(p.kind==TileKind.Vertical)p.closeChild(this))*/
+
   val rightButtons: List[Button] =Tile.factoryList map{
-    case ContentFactory(symbol,description,callBack) => button(`title`:=description,`class`:=StyleTRButton,onclick:={
+    case ContentFactory(symbol,description,callBack) =>
+      button(`title`:=description,`class`:=StyleTRButton,onclick:={
       () => try {
         open(callBack(), TileKind.Horizontal)
-      } catch {
-        case NonFatal(e) => util.Log.e("open", e)
-      }
+      } catch { case NonFatal(e) => util.Log.e("open", e) }
     })(symbol).render
   }
 
-  val closeButton:Button = button(`class`:=StyleTRButton,onclick:=closeMe _)("X").render
+  val closeButton:Button = button(`class`:=StyleTRButton,onclick:= {()=>closeMe()} )("X").render
   val wideButton:Button=button(`class`:=StyleTRButton,onclick:={
     ()=>if(maximized)recoverThis() else maximizeThis()})("<>").render
   val bottomButtonGroup: Div = div(`class`:="tile-button-group-bottom").render
@@ -85,9 +64,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
       button(`title`:=description,`class`:=StyleBLButton,onclick:={ ()=>
         try {
           open(callBack(), TileKind.Vertical)
-        } catch {
-          case NonFatal(e) => util.Log.e("open", e)
-        }
+        } catch { case NonFatal(e) => util.Log.e("open", e) }
       })(symbol).render
   }
   rightButtonGroup.appendChild(closeButton)
@@ -96,50 +73,35 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   myDiv.appendChild(bottomButtonGroup)
   //myDiv.appendChild(slideRight)
 
-  def closeMe():Unit={
+  protected def closeMe():Unit={
     for(p<-getParentTile)p.closeChild(this)
     notifyResize()
   }
 
   def getParentTile: Option[Tile] = parentTile
 
-  def clearContent():Unit= {
-    //println("clear")
+  def clearContent():Unit=
     while (myDiv.hasChildNodes())
       myDiv.removeChild(myDiv.firstChild)
-  }
 
   def setEdgeRight(trVisible:Boolean):Unit={
-    //println("Set Edge Right "+trVisible+" tile: "+this+" old:"+outerEdgeRight+" cont:"+myDiv.contains(slideRight))
     outerEdgeRight=trVisible
-    /*buttonGroup.style.setProperty("display",if(groupVisible) "initial" else "none")*/
-    if(trVisible) {
-      for(b<-rightButtons)
-      rightButtonGroup.appendChild(b)
-      //myDiv.appendChild(slideRight.myDiv)
-    }
-    else {
-      for(b<-rightButtons)
-      if(rightButtonGroup.contains(b)) rightButtonGroup.removeChild(b)
-      //if(myDiv.contains(slideRight.myDiv)) myDiv.removeChild(slideRight.myDiv)
-    }
+    if(trVisible)
+      for(b<-rightButtons) rightButtonGroup.appendChild(b)
+    else
+      for(b<-rightButtons) if(rightButtonGroup.contains(b)) rightButtonGroup.removeChild(b)
   }
 
-  def setEdgeBottom(visible:Boolean):Unit={
-    outerEdgeBottom=visible
-    if(visible) {
+  def setEdgeBottom(trVisible:Boolean):Unit={
+    outerEdgeBottom=trVisible
+    if(trVisible)
       for(b<-bottomButtons) bottomButtonGroup.appendChild(b)
-      //myDiv.appendChild(slideBottom.myDiv)
-    }
-    else {
+    else
       for(b<-bottomButtons) if(bottomButtonGroup.contains(b)) bottomButtonGroup.removeChild(b)
-      //if(myDiv.contains(slideBottom.myDiv)) myDiv.removeChild(slideBottom.myDiv)
-    }
-    //blButton.style.setProperty("display",if(visible)"initial" else "none")
   }
 
-  def setSingleContent(ncontent:TileContent):Unit = {
-    singleContent=Some(ncontent)
+  def setContent(ncontent:TileContent):Unit = {
+    content=Some(ncontent)
     myDiv.appendChild(ncontent.content)
   }
 
@@ -183,14 +145,13 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     maxRootParentElement.appendChild(tile.myDiv)
   }
 
-  def recoverRootFromMax():Unit= {
+  def recoverRootFromMax():Unit=
     if(maxRootParentElement!=null) {
       val childDiv=maxRootParentElement.children.item(0)
       maxRootParentElement.appendChild(myDiv)
       maxDivParentElement.appendChild(childDiv)
       maxRootParentElement=null
     }
-  }
 
 
   def setupDragListeners():Unit= for(drag<-dragArea){
@@ -204,91 +165,85 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     }
   }
 
+
   def open(newContent:TileContent,nkind:TileKind.Value): Unit = if(kind==TileKind.Single) {
-    util.Log.w("Open " + newContent + " " + nkind)
+    //util.Log.w("Open " + newContent + " " + nkind)
     clearContent()
     kind=nkind
-    val ft=new Tile(Some(this))
-    //println("Tile Open "+singleContent)
-    for(sc<-singleContent){
-      ft.setSingleContent(sc)
+    val nfirstTile=new Tile(Some(this))
+    if(content.isEmpty) Log.e("Content==None when open")
+    for(sc<-content){
+      nfirstTile.setContent(sc)
       newContent.init(sc.getSelection)
     }
-
     if(nkind==TileKind.Horizontal)
-      ft.setEdgeBottom(outerEdgeBottom)
-    else ft.setEdgeRight(trVisible = outerEdgeRight)
+      nfirstTile.setEdgeBottom(trVisible = outerEdgeBottom)
+    else nfirstTile.setEdgeRight(trVisible = outerEdgeRight)
     val drag=div(`class`:=(
       if(nkind==TileKind.Horizontal)Tile.StyleHDrag else Tile.StyleVDrag)).render
-
+    myDiv.appendChild(nfirstTile.myDiv)
     myDiv.appendChild(drag)
     dragArea=Some(drag)
     setupDragListeners()
-    myDiv.appendChild(ft.myDiv)
-    firstTile=Some(ft)
-    val st=new Tile(Some(this))
-    st.setSingleContent(newContent)
-    st.setEdgeRight(trVisible = outerEdgeRight)
-    st.setEdgeBottom(outerEdgeBottom)
-    myDiv.appendChild(st.myDiv)
-    secondTile=Some(st)
-    singleContent=None
-    //setEdgeRight(groupVisible = false,trVisible = false)
-    //setEdgeBottom(false)
+    firstTile=Some(nfirstTile)
+    val nSecondTile=new Tile(Some(this))
+    nSecondTile.setContent(newContent)
+    nSecondTile.setEdgeRight(trVisible = outerEdgeRight)
+    nSecondTile.setEdgeBottom(outerEdgeBottom)
+    myDiv.appendChild(nSecondTile.myDiv)
+    secondTile=Some(nSecondTile)
+    content=None
     updateLayout()
     notifyResize()
     //println("open done "+this+" ft:"+ft+" st:"+st+" r:"+outerEdgeRight+" b:"+outerEdgeBottom)
   } else util.Log.e("Cant open " + newContent + " tileKind:" + kind)
 
+
   protected def takeOver(tile:Tile,fromFirst:Boolean,otherTile:Tile):Unit= {
-      kind=tile.kind
-      if(tile.kind==TileKind.Single)  {
-        for(sc <- tile.singleContent) setSingleContent(sc)
-        firstTile = None
-        secondTile = None
-        dragArea = None
-        //println("take over single r:"+outerEdgeRight+" b:"+outerEdgeBottom)
-        myDiv.appendChild(rightButtonGroup)
-        myDiv.appendChild(bottomButtonGroup)
-        setEdgeRight(outerEdgeRight)
-        setEdgeBottom(outerEdgeBottom)
-        proportion=0.5
+    kind=tile.kind
+    if(tile.kind==TileKind.Single)  {
+      for(sc <- tile.content) setContent(sc)
+      firstTile = None
+      secondTile = None
+      dragArea = None
+      //println("take over single r:"+outerEdgeRight+" b:"+outerEdgeBottom)
+      myDiv.appendChild(rightButtonGroup)
+      myDiv.appendChild(bottomButtonGroup)
+      setEdgeRight(outerEdgeRight)
+      setEdgeBottom(outerEdgeBottom)
+      proportion=0.5
+    }
+    else {
+      tile.detachListeners()
+      for(cft<-tile.firstTile){
+        myDiv.appendChild(cft.myDiv)
+        cft.parentTile=Some(this)
       }
-      else {
-        tile.detachListeners()
-        for(cft<-tile.firstTile){
-          myDiv.appendChild(cft.myDiv)
-          cft.parentTile=Some(this)
-        }
-        myDiv.appendChild(tile.dragArea.get)
-        for(cst<-tile.secondTile){
-          myDiv.appendChild(cst.myDiv)
-          cst.parentTile=Some(this)
-        }
-        firstTile=tile.firstTile
-        secondTile=tile.secondTile
-        dragArea=tile.dragArea
-        setupDragListeners()
-        if(!tile.outerEdgeBottom && outerEdgeBottom) Tile.setEdgeBottom(this)
-        if(!tile.outerEdgeRight && outerEdgeRight) Tile.setEdgeRight(this)
+      myDiv.appendChild(tile.dragArea.get)
+      for(cst<-tile.secondTile){
+        myDiv.appendChild(cst.myDiv)
+        cst.parentTile=Some(this)
       }
+      firstTile=tile.firstTile
+      secondTile=tile.secondTile
+      dragArea=tile.dragArea
+      setupDragListeners()
+      if(!tile.outerEdgeBottom && outerEdgeBottom) Tile.setEdgeBottom(this)
+      if(!tile.outerEdgeRight && outerEdgeRight) Tile.setEdgeRight(this)
+    }
   }
 
 
 
   def closeChild(childTile:Tile):Unit =
     if (childTile.kind == TileKind.Single) {
-      for(s<-childTile.singleContent) s.close()
+      for(s<-childTile.content) s.close()
       clearContent()
-      //println("close this:"+this+" child:"+childTile)
-
-      if (firstTile.isDefined && firstTile.get == childTile) {
-        //println("Close first st:"+secondTile.get+" kind:"+secondTile.get.kind)
+      if (firstTile.isDefined && firstTile.get == childTile)
         for (st <- secondTile;ft<-firstTile) takeOver(st,fromFirst = false,ft)
-      } else if (secondTile.isDefined && secondTile.get == childTile) {
-        //println("close second ft:"+firstTile.get+" kind:"+firstTile.get.kind)
+      else if (secondTile.isDefined && secondTile.get == childTile)
         for (ft <- firstTile;st<-secondTile) takeOver(ft,fromFirst = true,st)
-      } else println("close, Unknown child " + childTile+" ft:"+firstTile+" st:"+secondTile)
+       else println("close, Unknown child " + childTile+" ft:"+firstTile+" st:"+secondTile)
 
     } else println("close but not single " + childTile.kind)
 
@@ -309,7 +264,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
       }
       document.addEventListener("mousemove",moveFunc,useCapture = false)
 
-      lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent)=>{
+      lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit]=(_:MouseEvent)=>{
         document.removeEventListener("mousemove",moveFunc,useCapture = false)
         document.removeEventListener("mouseup",remove,useCapture = false)
         notifyResize()
@@ -317,6 +272,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
 
       document.addEventListener("mouseup",remove,useCapture = false)
     }
+
 
   lazy val verticalTouchDrag:scala.scalajs.js.Function1[TouchEvent, Unit]=(e:TouchEvent)=> for (drag<-dragArea) {
     //myDiv.appendChild(p("touch "+e.touches.length).render)
@@ -338,7 +294,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
       }
       document.addEventListener("touchmove", moveFunc, useCapture = false)
 
-      lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit] = (e: MouseEvent) => {
+      lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit] = (_: MouseEvent) => {
         document.removeEventListener("touchmove", moveFunc, useCapture = false)
         document.removeEventListener("touchend", remove, useCapture = false)
         document.removeEventListener("touchcancel", remove, useCapture = false)
@@ -367,7 +323,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     }
     document.addEventListener("mousemove",moveFunc,useCapture = false)
 
-    lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent)=>{
+    lazy val remove: scala.scalajs.js.Function1[MouseEvent, Unit]=(_:MouseEvent)=>{
       document.removeEventListener("mousemove",moveFunc,useCapture = false)
       document.removeEventListener("mouseup",remove,useCapture = false)
       notifyResize()
@@ -393,7 +349,7 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
     }
     document.addEventListener("touchmove",moveFunc,useCapture = false)
 
-    lazy val remove: scala.scalajs.js.Function1[TouchEvent, Unit]=(e:TouchEvent)=>{
+    lazy val remove: scala.scalajs.js.Function1[TouchEvent, Unit]=(_:TouchEvent)=>{
       document.removeEventListener("touchcancel",remove,useCapture = false)
       document.removeEventListener("touchmove",moveFunc,useCapture = false)
       document.removeEventListener("touchend",remove,useCapture = false)
@@ -414,8 +370,6 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
       drag.removeEventListener("touchStart",verticalTouchDrag)
     }
   }
-
-
 
 
   def updateLayout(): Unit ={
@@ -448,14 +402,13 @@ class Tile(nparentTile:Option[Tile]=None,val isTop:Boolean=false) {
   }
 
   def notifyChildrenResize():Unit= kind match {
-    case TileKind.Single => for(s<-singleContent) s.updateResize()
+    case TileKind.Single => for(s<-content) s.updateResize()
     case TileKind.Horizontal|TileKind.Vertical=>
       for(f<-firstTile)f.notifyChildrenResize()
       for(f<-secondTile)f.notifyChildrenResize()
   }
 
   def notifyResize():Unit = findRoot().notifyChildrenResize()
-
 }
 
 
@@ -565,5 +518,5 @@ object Tile {
         for(st<-tile.secondTile) setEdgeRight(st)
     }
   }
-  def createRandomContent=new TestContent(colors(Math.floor(Math.random()*10).toInt))
+  //def createRandomContent=new TestContent(colors(Math.floor(Math.random()*10).toInt))
 }

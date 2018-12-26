@@ -39,7 +39,7 @@ class CellEditor {
       }  else {key.stopPropagation();finishEdit(0)} // enter
       case 37=> if(cell.selectionStart>0)key.stopPropagation()
       case 35|36|38|40=> key.stopPropagation()
-      case 39=> if(cell.selectionEnd<cell.value.size)key.stopPropagation()
+      case 39=> if(cell.selectionEnd<cell.value.length)key.stopPropagation()
 
       case 27=> cancelEdit()  // esc
       case _=>

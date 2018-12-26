@@ -3,6 +3,8 @@ package clientbase.control
 import org.scalajs.dom.window
 import org.scalajs.dom.raw._
 
+import scala.scalajs.js
+import scala.scalajs.js.Dynamic
 import scala.scalajs.js.annotation.JSExport
 /**
  * Created by Peter Holzer on 24.09.2015.
@@ -40,7 +42,7 @@ abstract class LongTouchControl(elem:HTMLElement)  {
   def onLongTouch():Unit={println("Hello")}
 
   def setup():Unit= {
-    elem.addEventListener("touchstart", touchStart _, useCapture = false)
+    elem.addEventListener("touchstart", touchStart _,useCapture =  false )
     elem.addEventListener("touchend", touchEnd _, useCapture =false)
     elem.addEventListener("touchmove", touchEnd _, useCapture =false)
     elem.addEventListener("touchcancel", touchEnd _, useCapture =false)

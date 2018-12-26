@@ -30,7 +30,7 @@ abstract class AnswerPanel {
 
 class StringAnswerPanel extends AnswerPanel {
   def typeString="text"
-  val inputField=ActiveEditField(typeString,"",(text)=> parseText(text) match {
+  val inputField=ActiveEditField(typeString,"",text=> parseText(text) match {
     case Some(const)=> DialogManager.answerGiven(answerDefinition,const)
     case None=> println("cant parse "+text)
   })
@@ -41,7 +41,7 @@ class StringAnswerPanel extends AnswerPanel {
   }
 
 
-  def parseText(st:String):Option[Constant]=Some(new StringConstant(st))
+  def parseText(st:String):Option[Constant]=Some(StringConstant(st))
 
   override def reset(): Unit = inputField.value=""
 
@@ -58,7 +58,7 @@ class DoubleAnswerPanel extends StringAnswerPanel {
 class IntAnswerPanel extends StringAnswerPanel {
   override def typeString="number"
   override def parseText(st: String): Option[Constant] = st match {
-    case StrToInt(d) => Some(new IntConstant(d))
+    case StrToInt(d) => Some(IntConstant(d))
     case _ => None
   }
 }

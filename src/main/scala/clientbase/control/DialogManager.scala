@@ -57,7 +57,7 @@ object DialogManager {
 
   }
 
-  def answerGiven(adef:AnswerDefinition,result:Constant)= if(currentAction.isDefined){
+  def answerGiven(adef:AnswerDefinition,result:Constant): Unit = if(currentAction.isDefined){
     println("Answer given "+adef.name+" = "+result+" "+result.getType)
     answerList+= ((adef.name,result))
     adef.followQuestion match {

@@ -25,8 +25,7 @@ class TableContent extends TileContent {
   init(Nil)
 
   def init(selection:Iterable[Referencable]):Unit= {
-    WebSocketConnector.createPathSubscription(if(selection.isEmpty) getRoot else
-      selection.head.ref,pathMod)
+    WebSocketConnector.createPathSubscription( getRoot,pathMod)
   }
   def getSelection:Iterable[Referencable]={
     //println("Get selection "+SelectionController.currentSelection.mkString)
@@ -40,7 +39,7 @@ class TableContent extends TileContent {
     if(params.length==2) {
       params(1) match {
         case Reference(ref)=> ref
-        case _=> println("wrong parameter format "+params(1), "use: type,inst");WebSocketConnector.root
+        case _=> println("wrong parameter format "+params(1)+ "use: type,inst");WebSocketConnector.root
       }
     } else WebSocketConnector.root
   }

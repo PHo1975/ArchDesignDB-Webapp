@@ -1,8 +1,8 @@
 package clientbase.tableview
 
-import clientbase.connection.{ InstSubscriber, WebSocketConnector }
+import clientbase.connection.{InstSubscriber, WebSocketConnector}
 import clientbase.control.SelectionController
-import definition.data.{ InstanceData, OwnerReference, Reference }
+import definition.data.{InstanceData, OwnerReference, Reference}
 import definition.typ.AllClasses
 import org.scalajs.dom
 import org.scalajs.dom.document
@@ -11,12 +11,14 @@ import org.scalajs.dom.raw.HTMLElement
 import util.Log
 import scalatags.JsDom.all._
 
+import scala.collection.mutable.ArrayBuffer
+
 /**
  * Created by Peter Holzer on 09.08.2015.
  */
 class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubscriber {
 
-  protected val propList=collection.mutable.ArrayBuffer[PropertyModel]()
+  protected val propList: ArrayBuffer[PropertyModel] =collection.mutable.ArrayBuffer[PropertyModel]()
   var oldData:Seq[InstanceData]=Seq.empty
 
   override def onLoad(data: Iterator[InstanceData]): Unit = {
@@ -47,21 +49,21 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
         val rowDiv = div(overflow := "hidden", clear := "both").render
         rowDiv.appendChild(p(`class`:="prfieldtitle")(propField.name+":").render)
         if(createClasses.nonEmpty){
-          def clearButtons()={
+          def clearButtons(): Unit ={
             val numChild=rowDiv.childElementCount
-            for(i<-2 until numChild)
+            for(_<-2 until numChild)
               rowDiv.removeChild(rowDiv.children(2))
           }
-          def showNewClasses()={
+          def showNewClasses(): Unit ={
             clearButtons()
             for(cr<-createClasses)
               rowDiv.appendChild(button(`class`:="prfield-createbutton",onclick:={()=>{
-                WebSocketConnector.createInstance(cr.childClassID,Array(new OwnerReference(prIx,topRef)),(_)=>{})
+                WebSocketConnector.createInstance(cr.childClassID,Array(new OwnerReference(prIx,topRef)),_=>{})
                 clearButtons()
               }})(cr.childName).render)
           }
 
-          if (WebSocketConnector.editable) rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => showNewClasses })("Neu...").render)
+          if (WebSocketConnector.editable) rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => showNewClasses() })("Neu...").render)
         }
         contentNode.appendChild(rowDiv)
         val divNode=div(`class`:="prfielddiv").render

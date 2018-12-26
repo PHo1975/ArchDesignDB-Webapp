@@ -2,21 +2,27 @@ package clientbase.viewer2d
 
 import clientbase.control.SelectionController
 import clientbase.tilelayout.TileContent
-import definition.data.Referencable
-import org.scalajs.dom.html.{ Button, Div, Select, Option ⇒ DomOption }
-import org.scalajs.dom.raw.{ Event, HTMLElement, MouseEvent }
+import definition.data.{Referencable, Reference}
+import definition.typ.SelectGroup
+import org.denigma.threejs.Object3D
+import org.scalajs.dom.html.{Button, Div, Select, Option => DomOption}
+import org.scalajs.dom.raw.{Event, HTMLElement, MouseEvent}
 import util.Log
+
+import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scalatags.JsDom.all._
 
+import scala.scalajs.js
+
 object ControllerState extends Enumeration {
-  val SelectElems = Value("Select")
-  val AskPoint = Value("AskPoint")
-  val AskObject = Value("Chose")
-  val AskPointOrObject = Value("PointOrObject")
-  val InPlaceEdit = Value("InPlaceEdit")
-  val SelectPoints = Value("SelectPoints")
-  val DragDrop = Value("DragDrop")
+  val SelectElems: ControllerState.Value = Value("Select")
+  val AskPoint: ControllerState.Value = Value("AskPoint")
+  val AskObject: ControllerState.Value = Value("Chose")
+  val AskPointOrObject: ControllerState.Value = Value("PointOrObject")
+  val InPlaceEdit: ControllerState.Value = Value("InPlaceEdit")
+  val SelectPoints: ControllerState.Value = Value("SelectPoints")
+  val DragDrop: ControllerState.Value = Value("DragDrop")
 }
 
 /**
@@ -24,11 +30,11 @@ object ControllerState extends Enumeration {
   */
 class Viewer2DController extends TileContent with ElemContainer {
   val layerPan = new LayerListPan(this)
-  val zoomAllBut: Button = button(onclick := { (e: MouseEvent) => {
+  val zoomAllBut: Button = button(onclick := { _: MouseEvent => {
     zoomAll()
   }
   })("Alles").render
-  val layerListBut: Button = button(onclick := { (e: MouseEvent) => {
+  val layerListBut: Button = button(onclick := { _: MouseEvent => {
     layerPan.toggleVisibility()
   }
   })("Layer").render
@@ -38,7 +44,7 @@ class Viewer2DController extends TileContent with ElemContainer {
   val horCross: Div = div(`class`:="crosshairdivs").render
   val vertCross: Div = div(`class`:="crosshairdivs").render
   val canvasHolder: Div = div(`class` := "viewer2dcanvas")(horCross, vertCross).render
-  Log.w("create Viewer ")
+  val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
 
   override val content: HTMLElement = div(`class`:="viewer2dcontent")(
     layerPan.pane,
@@ -50,17 +56,20 @@ class Viewer2DController extends TileContent with ElemContainer {
   //var movetime:Long=0
 
   for ((id, sc) <- ScaleModel.scales) scaleSelect.appendChild(option(attr("sid") := id.toString)(scaleToString(sc)).render)
-  scaleSelect.onchange = (e: Event) => {
+  scaleSelect.onchange = (_: Event) => {
     scaleSelect.selectedIndex match {
       case -1 =>
       case ix => ScaleModel.scales(ix)
     }
   }
 
-  def scaleRatio:Double= scaleModel.relativeScaleValue
+  def scaleRatio:Double= {
+    scaleModel.relativeScaleValue
+  }
 
   def scaleToString(rel: Double): String = if (rel < 1) "1 : " + math.round(1d / rel) else math.round(rel) + " : 1"
 
+  // init from parent Tile
   override def init(selection: Iterable[Referencable]): Unit =
     try {
       layerList.loadLayers(selection)
@@ -81,14 +90,15 @@ class Viewer2DController extends TileContent with ElemContainer {
 
   def readyLoaded():Unit={
     for (l <- layerList.subscriberList) layerPan.addLayer(l)
-    println("ready loaded " + layerList.subscriberList.length)
+    Log.w("ready loaded " + layerList.subscriberList.length)
     zoomAll()
     dataUpdated()
   }
 
   def dataUpdated():Unit= if(layerList.loaded){
+    //Log.w("Update "+layerList.loaded)
     canvasHandler.repaint()
-  } else println("Updated " + layerList.loaded)
+  }
 
   override def updateResize():Unit={
     canvasHandler.onResize()
@@ -96,10 +106,10 @@ class Viewer2DController extends TileContent with ElemContainer {
 
   def zoomAll():Unit= {
     val bounds=layerList.calcBounds()
-    /*println("zoomall size:"+layerList.subscriberList.size+" mx:"+bounds.minX+" my:"+bounds.minY+" max:"+bounds.maxX+
-    "maxy:"+bounds.maxY)*/
-    if(bounds.maxX==Double.MaxValue){ // no elements in layer, still max value
-      util.Log.w("ZoomAll bounds=null "+bounds)
+    Log.e("zoomall size:"+layerList.subscriberList.size+" mx:"+bounds.minX+" my:"+bounds.minY+" max:"+bounds.maxX+
+    "maxy:"+bounds.maxY)
+    if(bounds.maxX==Short.MaxValue.toDouble){ // no elements in layer, still max value
+      //util.Log.w("ZoomAll bounds=null "+bounds)
       scaleModel.setWorldBounds(-1,-1,5,5)
       canvasHandler.adjustCamera()
     }
@@ -122,9 +132,9 @@ class Viewer2DController extends TileContent with ElemContainer {
       case MouseButtons.LEFT ⇒
         controllerState match {
           case ControllerState.SelectElems ⇒
-            val elems = canvasHandler.pickElems(screenx, screeny)
+            val elems: js.Array[Reference] = canvasHandler.pickElems(screenx, screeny)
             println("elems:" + elems.mkString(", "))
-            val newSelection = layerList.decodeSelection(elems)
+            val newSelection: Seq[SelectGroup[_ <: Referencable]] = layerList.decodeSelection(elems)
             println("new selection:" + newSelection.mkString(", "))
             SelectionController.select(newSelection)
             dataUpdated()
@@ -134,4 +144,11 @@ class Viewer2DController extends TileContent with ElemContainer {
     }
 
 
+  override def addGeometry(gr: Object3D): Unit = try {
+    if (gr != null) {
+      canvasHandler.addGeometry(gr)
+    }
+  } catch {
+    case e: Throwable => Log.e("add geometry " + gr, e)
+  }
 }

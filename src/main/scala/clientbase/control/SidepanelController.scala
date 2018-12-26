@@ -24,7 +24,7 @@ object SidepanelController {
   val switchButton: Button =button(id:="switchbut",tabindex:= -1)("\u2261").render
   var open=false
   val selCheck: Input = input(`type` := "checkbox", id := "multiSelectCheck", float := "right").render
-  selCheck.onclick=(e:MouseEvent)=>{multiSelectMode=selCheck.checked}
+  selCheck.onclick=(_:MouseEvent)=>{multiSelectMode=selCheck.checked}
   val selectionHeader: Div = div(label(`class` := "label", float := "left")("Auswahl:  "), selCheck, label(`class` := "label", `for` := "multiSelectCheck", float := "right")("mehrfach")).render
   val selectionLabel: Span = span(`class` := "label", width := "100%", backgroundColor := "#f6f6f6", float := "left")(" - ").render
   val selectionArea: Div =div(`class`:="sidepanelpart")(selectionHeader,selectionLabel).render

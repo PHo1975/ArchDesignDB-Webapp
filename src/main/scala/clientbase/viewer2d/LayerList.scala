@@ -21,7 +21,6 @@ class LayerList(controller:Viewer2DController) {
     if(nlist.isEmpty) controller.readyLoaded()
     else {
       val layerList=nlist.filter(_.ref.typ==GraphElem.LAYERTYPE).toIndexedSeq
-      //println("LayerList "+layerList.mkString("|"))
       val numLayer=layerList.size
       var currentLayer=0
 
@@ -42,15 +41,22 @@ class LayerList(controller:Viewer2DController) {
   }
 
   def setActiveLayer(lay: LayerSubscriber): Unit = {
+    for(ol<-activeLayer) ol.setActive(false)
     activeLayer = Some(lay)
     lay.show()
     lay.setEditable(true)
     lay.setActive(true)
   }
 
+  def forceActiveLayer(lay:LayerSubscriber):Unit= {
+    for(l<-subscriberList;if l.visible) l.hide()
+    setActiveLayer(lay)
+  }
+
   def toggleVisibility(lay: LayerSubscriber): Unit = {
     if (lay.visible) {
       lay.hide()
+      lay.setEditable(false)
       for (f ← activeLayer; if f == lay) {
         f.setActive(false)
         activeLayer = None
@@ -59,11 +65,13 @@ class LayerList(controller:Viewer2DController) {
   }
 
   def toggleEditable(lay: LayerSubscriber): Unit = {
-    if (lay.editable)
+    if (lay.editable) {
       for (f ← activeLayer; if f == lay) {
         f.setActive(false)
         activeLayer = None
       }
+      lay.hide()
+    } else if(!lay.visible) lay.show()
     lay.setEditable(!lay.editable)
   }
 
@@ -72,10 +80,10 @@ class LayerList(controller:Viewer2DController) {
 
   def calcBounds(): BRect ={
     //println("Calcbounds "+subscriberList.size)
-    var x1=Double.MaxValue
-    var y1=Double.MaxValue
-    var x2=Double.MinValue
-    var y2=Double.MinValue
+    var x1:Double=Short.MaxValue
+    var y1:Double=Short.MaxValue
+    var x2:Double=Short.MinValue
+    var y2:Double=Short.MinValue
     for(el<-subscriberList;if el.visible )  {
       val l=el.bounds
       if(l.minX<x1) x1=l.minX
@@ -83,12 +91,12 @@ class LayerList(controller:Viewer2DController) {
       if(l.maxX>x2) x2=l.maxX
       if(l.maxY>y2) y2=l.maxY
     }
-    //println("bounds "+x1+"|"+y1+" - "+x2+"|"+y2)
+    //Log.w("bounds "+x1+"|"+y1+" - "+x2+"|"+y2)
     BRect(x1,y1,x2,y2)
   }
 
   def readyLoaded():Unit={
-    //println("list ready loaded " +subscriberList.size)
+    println("ready Loaded"+subscriberList.size)
     loaded=true
     for (l ← subscriberList.headOption) setActiveLayer(l)
     controller.readyLoaded()
