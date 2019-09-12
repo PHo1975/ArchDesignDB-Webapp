@@ -8,7 +8,6 @@ import util.Log
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSGlobal
 import scala.scalajs.js.typedarray.Float32Array
 
 /**
@@ -24,6 +23,16 @@ trait Bounds{
 }
 
 case class BRect(minX:Double,minY:Double,maxX:Double,maxY:Double) extends Bounds
+
+class BoundsContainer(var minX:Double=0d,var minY:Double=0d,var maxX:Double=0d,var maxY:Double=0d) extends Bounds {
+  def isEmpty: Boolean = minX==Double.MinValue & minY == Double.MinValue && maxX==Double.MinValue & maxY == Double.MinValue
+  def setEmpty():Unit = {
+    minX=Double.MinValue
+    minY=Double.MinValue
+    maxX=Double.MinValue
+    maxY=Double.MinValue
+  }
+}
 
 trait Formatable extends Referencable {
   def getFormatFieldValue(fieldNr: Int): Constant
@@ -45,6 +54,8 @@ trait SelectionDecorable {
 
 abstract class GraphElem(override val ref: Reference, val color: Int) extends Formatable with SelectionDecorable {
   def getBounds(container: ElemContainer): Bounds
+  def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit = res.setEmpty()
+
   def createGeometry(container:ElemContainer):Unit
   def geometry:js.Array[Object3D]
 
@@ -53,15 +64,18 @@ abstract class GraphElem(override val ref: Reference, val color: Int) extends Fo
     case _ ⇒
   }
 
-  def hideSelection(): Unit = for(obj<-geometry) obj match {
+  def hideSelection(): Unit = {
+    println("hideselection "+ref)
+    for(obj<-geometry) obj match {
     case m: Mesh ⇒ m.material = GraphElem.getMaterial(color)
     case _ ⇒
-  }
+  }}
 }
 
 class GraphElemStub(override val ref:Reference) extends GraphElem(ref,0)  {
   def getFormatFieldValue(fieldNr:Int):Constant=EMPTY_EX
   def getBounds(container: ElemContainer): Bounds =GraphElem.NULLRECT
+
   def createGeometry(container:ElemContainer): Unit = {}
   //def hideSelection(): Unit = {}
   def geometry:js.Array[Object3D]=null
@@ -90,6 +104,8 @@ abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlin
   def maxX: Double = scala.math.max(startPoint.x, endPoint.x)
   def maxY: Double = scala.math.max(startPoint.y, endPoint.y)
 
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
+    GraphElem.calcScreenBoundsfrom2Points(startPoint,endPoint,camera,res)
 
   override def getBounds(container: ElemContainer): Bounds = this
 }
@@ -115,6 +131,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
   //println("create arc "+ref+" "+centerPoint)
   lazy val points:Seq[VectorConstant]=List(pointFromAngle(startAngle),pointFromAngle(endAngle),centerPoint)
   protected lazy val bounds: BRect = calcArcBounds
+  protected val cornerPoints: ArrayBuffer[VectorConstant] =ArrayBuffer[VectorConstant]()
 
   def deltaW: Double = {
     val value = endAngle - startAngle + (if (endAngle < startAngle) 360d else 0)
@@ -128,21 +145,30 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
     new VectorConstant(centerPoint.x+scala.math.cos(angle*scala.math.Pi/180d)*diameter,
       centerPoint.y+scala.math.sin(angle*scala.math.Pi/180d)*diameter,0)
 
-  def calcArcBounds: BRect = {
-    val pointBuffer = collection.mutable.ArrayBuffer[VectorConstant]() += points.head += points.tail.head
-    val sa = startAngle % 360d
-    var ea = (if (endAngle < sa) endAngle + 360d else endAngle) % 360d
-    if (ea == sa) ea += 360d
-    var nextSegmentAngle = ((scala.math.floor(sa / 90d) + 1d) * 90d) % 360d
-    //System.out.println("startAngle "+sa+" "+nextSegmentAngle+" ea:"+ea)
-    while (nextSegmentAngle < ea) {
-      val np = pointFromAngle(nextSegmentAngle)
-      //System.out.println("nxa:"+nextSegmentAngle+"Np "+np)
-      pointBuffer += np
-      nextSegmentAngle += 90d
+  protected def createBoundsPoints: Seq[VectorConstant] = {
+    if(cornerPoints.isEmpty) {
+      cornerPoints += points.head += points.tail.head
+      val sa = startAngle % 360d
+      var ea = (if (endAngle < sa) endAngle + 360d else endAngle) % 360d
+      if (ea == sa) ea += 360d
+      var nextSegmentAngle = ((scala.math.floor(sa / 90d) + 1d) * 90d) % 360d
+      //System.out.println("startAngle "+sa+" "+nextSegmentAngle+" ea:"+ea)
+      while (nextSegmentAngle < ea) {
+        val np = pointFromAngle(nextSegmentAngle)
+        //System.out.println("nxa:"+nextSegmentAngle+"Np "+np)
+        cornerPoints += np
+        nextSegmentAngle += 90d
+      }
     }
-    GraphElem.getPointsBounds(pointBuffer)
+    cornerPoints
   }
+
+  def calcArcBounds: BRect = {
+    GraphElem.getPointsBounds(createBoundsPoints)
+  }
+
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
+    GraphElem.calcScreenBoundsfromPointList(createBoundsPoints.iterator,camera,res)
 
   override def createGeometry(container:ElemContainer): Unit = {
     try {
@@ -161,6 +187,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
 }
 
 
+
 case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineStyle: Int, centerPoint: VectorConstant,
                           r1: Double, r2: Double, mainAngle: Double, startAngle: Double, endAngle: Double) extends LinearElement(nref, ncolor, nlineWidth, nlineStyle) {
 
@@ -169,6 +196,7 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
 
   lazy val points: Seq[VectorConstant] = List(pointFromAngle(startAngle * math.Pi / 180d), pointFromAngle(endAngle * math.Pi / 180d), centerPoint)
   protected lazy val bounds: Bounds = calcBounds
+  protected val cornerPoints: ArrayBuffer[VectorConstant] =ArrayBuffer[VectorConstant]()
 
   def getInnerAngle(outerAngle: Double, delta: Double): Double =
     if (outerAngle > math.Pi / 2) {
@@ -189,19 +217,27 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
     new VectorConstant(dx * cosMa - dy * sinMa + centerPoint.x, dx * sinMa + dy * cosMa + centerPoint.y, 0)
   }
 
-  def calcBounds: Bounds = {
-    val pointBuffer = collection.mutable.ArrayBuffer[VectorConstant]() += points.head += points.tail.head
-    val ea = if (endAngle < startAngle) endAngle + 360 else endAngle
-    var nextSegmentAngle = (scala.math.floor(startAngle / 90) + 1) * 90
-    while (nextSegmentAngle < ea) {
-      val np = pointFromAngle(nextSegmentAngle * math.Pi / 180d)
-      pointBuffer += np
-      nextSegmentAngle += 90
+  def calcBounds: Bounds =  GraphElem.getPointsBounds(createBoundsPoints)
+
+
+  protected def createBoundsPoints: ArrayBuffer[VectorConstant] = {
+    if(cornerPoints.isEmpty) {
+      cornerPoints += points.head += points.tail.head
+      val ea = if (endAngle < startAngle) endAngle + 360 else endAngle
+      var nextSegmentAngle = (scala.math.floor(startAngle / 90) + 1) * 90
+      while (nextSegmentAngle < ea) {
+        val np = pointFromAngle(nextSegmentAngle * math.Pi / 180d)
+        cornerPoints += np
+        nextSegmentAngle += 90
+      }
     }
-    GraphElem.getPointsBounds(pointBuffer)
+    cornerPoints
   }
 
   override def getBounds(container: ElemContainer): Bounds = bounds
+
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
+    GraphElem.calcScreenBoundsfromPointList(createBoundsPoints.iterator,camera,res)
 
   def deltaW: Double = {
     val value = endAngle - startAngle + (if (endAngle < startAngle) 360d else 0)
@@ -255,44 +291,72 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
   }
 }
 
+
+
 case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorConstant,fontName:String,fheight:Double,
                        widthRatio:Double,style:Int,
                        textAngle:Double,obligeAngle:Double,lineSpace:Double) extends GraphElem(nref,ncolor) {
   protected val _geometry=new js.Array[Object3D]
   val meshName: String ="T"+ref.instance
+  protected var textWidth: Double = -1d
 
+  protected var cornerPoints:Array[VectorConstant]=_
+  //println("Text "+text)
   def isStyle(pattern: Int): Boolean = (style & pattern) > 0
 
   override def geometry:js.Array[Object3D]=_geometry
 
   protected def calcBounds(container:ElemContainer):Bounds= {
     val height=fheight/1000d*container.scaleRatio
-    val width=height*text.length/2
+    val width=if(textWidth>0) textWidth/2 else height*text.length/2
     BRect(position.x-width,position.y-height/2,position.x+width,position.y+height/2)
   }
 
+
+
   override def getBounds(container: ElemContainer): Bounds = calcBounds(container)
+
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit = {
+    if (cornerPoints==null) {
+      cornerPoints=new Array[VectorConstant](4)
+      val height=fheight/1000d*container.scaleRatio
+      val width=if(textWidth>0) textWidth else height*text.length/2
+      val x=position.x+(if(isStyle(GraphElem.rightStyle))-textWidth
+      else if(isStyle(GraphElem.hCenterStyle)) -textWidth/2 else 0)
+      val y=position.y+ (if(isStyle(GraphElem.bottomStyle))-height
+      else if (isStyle(GraphElem.vCenterStyle)) -height/2 else 0)
+      cornerPoints(0)=new VectorConstant(x,y,0)
+      cornerPoints(1)=new VectorConstant(x,y+height,0)
+      cornerPoints(2)=new VectorConstant(x+width,y+height,0)
+      cornerPoints(3)=new VectorConstant(x+width,y,0)
+    }
+    GraphElem.calcScreenBoundsfromPointList(cornerPoints.iterator,camera,res)
+  }
+
 
 
   override def createGeometry(container:ElemContainer): Unit = try{
 
-    GraphElem.loadTextGeometry(container,text,fheight,fontName, tg=>{
-      tg.head.computeBoundingBox()
-      tg.last.computeBoundingBox()
-      val textWidth=tg.last.boundingBox.max.x-tg.head.boundingBox.min.x
-      val textHeight=fheight/1000*container.scaleRatio
-      //println("textheight:"+fheight+" width:"+textWidth)
-      for(g<-tg) {
-        val mesh = new Mesh(g, GraphElem.getMaterial(color))
-        mesh.position.set(position.x+ (if(isStyle(GraphElem.rightStyle))-textWidth
-                                      else if(isStyle(GraphElem.hCenterStyle)) -textWidth/2 else 0) ,
-                          position.y+ (if(isStyle(GraphElem.bottomStyle))-textHeight
-                          else if (isStyle(GraphElem.vCenterStyle)) -textHeight/2 else 0  ), 0f)
-        mesh.rotation.z = textAngle * Math.PI / 180d
-        mesh.name = meshName
-        container.addGeometry(mesh)
-        _geometry.push(mesh)
-      }
+    GraphElem.loadTextGeometry(container,text,fheight,fontName, (tg: js.Array[ShapeGeometry]) =>{
+      if(tg.length>0) {
+        tg.head.computeBoundingBox()
+        tg.last.computeBoundingBox()
+
+        textWidth = tg.last.boundingBox.max.x - tg.head.boundingBox.min.x
+        val textHeight = fheight / 1000 * container.scaleRatio
+        //println("text:"+text+ " textheight:"+fheight+" width:"+textWidth+" tg:"+tg.length)
+        for (g <- tg) {
+          val mesh = new Mesh(g, GraphElem.getMaterial(color))
+          mesh.position.set(position.x + (if (isStyle(GraphElem.rightStyle)) -textWidth
+          else if (isStyle(GraphElem.hCenterStyle)) -textWidth / 2 else 0),
+            position.y + (if (isStyle(GraphElem.bottomStyle)) -textHeight
+            else if (isStyle(GraphElem.vCenterStyle)) -textHeight / 2 else 0), 0f)
+          mesh.rotation.z = textAngle * Math.PI / 180d
+          mesh.name = meshName
+          container.addGeometry(mesh)
+          _geometry.push(mesh)
+        }
+      } else println("Emtpy Text Geometry for Text:"+text+" font:"+fontName)
     })
 
   }catch {
@@ -311,14 +375,16 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
 
 
 
-
+  /***************************************************************************************************************************************/
 
   object GraphElem {
   final val LAYERTYPE = 39
   final val LINETYPE = 40
   final val ARCTYPE = 41
+  final val FILLTYPE = 42
   final val ELLIPSETYP = 43
   final val TEXTTYP = 44
+  final val SYMBOLTYP = 45
   final val DIMLINETYP= 46
   final val NULLRECT: BRect = BRect(0, 0, 0, 0)
   final val schrittWeiteKreis = 11.25d
@@ -417,10 +483,11 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
       isFontLoading=true
       fontLoader.load(fname, (nfont: ThreeFont) => {
         font=nfont
-        println("load font "+font)
+        println("load font "+fname)
         callback(font,false)
-        for(cb<-fontLoadCallbacks)cb(font,false)
-        fontLoadCallbacks.last(null,true)
+        for(cb<-fontLoadCallbacks) cb(font,false)
+        if(fontLoadCallbacks.nonEmpty)
+          fontLoadCallbacks.last(null,true)
         fontLoadCallbacks.clear()
         isFontLoading=false
       })
@@ -436,8 +503,8 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
       var y2=points.head.y
       if(points.size>1) for(ix <-1 until points.size) {
         val p=points(ix)
-        if(p.x<x1){ x1=p.x }
-        if(p.y<y1){ y1=p.y }
+        if(p.x<x1) x1=p.x
+        if(p.y<y1) y1=p.y
         if(p.x>x2) x2=p.x
         if(p.y>y2) y2=p.y
       }
@@ -447,7 +514,8 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
   val materialCache: mutable.HashMap[Int, MeshBasicMaterial] = collection.mutable.HashMap[Int, MeshBasicMaterial]()
 
   def getMaterial(color: Int): MeshBasicMaterial = materialCache.getOrElseUpdate(color, {
-    val c = new Color((color / 256 / 256).toDouble / 256d, ((color / 256) % 256).toDouble / 256d, (color % 256).toDouble / 256d)
+    //Integer.toHexString(color)
+    val c = new Color(((color >> 16) & 0xff).toDouble / 256d, ((color >> 8) & 0xff).toDouble / 256d, (color & 0xff).toDouble / 256d)
     val mat = new MeshBasicMaterial
     mat.color = c
     mat.side = THREE.DoubleSide
@@ -463,4 +531,67 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
   def getLine(length: Double, width: Double): PlaneBufferGeometry = lineCache.getOrElseUpdate((length, width), {
     new PlaneBufferGeometry(length, width)
   })
+
+
+  def calcBounds(list:TraversableOnce[GraphElem],controller:ElemContainer):BRect= {
+    var x1:Double=Short.MaxValue
+    var y1:Double=Short.MaxValue
+    var x2:Double=Short.MinValue
+    var y2:Double=Short.MinValue
+    for(el<-list) el match {
+      case _:GraphElemStub=>
+      case g:GraphElem=>
+        val l=g.getBounds(controller)
+        if(l.minX!=0 || l.minY!=0 || l.maxX!=0 || l.maxY !=0 ) {
+          if (l.minX < x1) x1 = l.minX
+          if (l.minY < y1) y1 = l.minY
+          if (l.maxX > x2) x2 = l.maxX
+          if (l.maxY > y2) y2 = l.maxY
+        }
+    }
+    BRect(x1,y1,x2,y2)
+  }
+
+  def calcScreenBoundsfrom2Points(p1:VectorConstant, p2:VectorConstant, camera:Camera, res:BoundsContainer): Unit = {
+      projectVector.x=p1.x
+      projectVector.y=p1.y
+      projectVector.z=0
+      projectVector.project(camera)
+      val sx1=projectVector.x
+      val sy1=projectVector.y
+      projectVector.x=p2.x
+      projectVector.y=p2.y
+      projectVector.z=0
+      projectVector.project(camera)
+      val sx2=projectVector.x
+      val sy2=projectVector.y
+      res.minX=scala.math.min(sx1,sx2)
+      res.maxX=scala.math.max(sx1,sx2)
+      res.minY=scala.math.min(sy1,sy2)
+      res.maxY=scala.math.max(sy1,sy2)
+  }
+
+
+  def calcScreenBoundsfromPointList(points:Iterator[VectorConstant], camera:Camera, res:BoundsContainer): Unit = {
+    res.minX=Double.MaxValue
+    res.maxX=Double.MinValue
+    res.minY=Double.MaxValue
+    res.maxY=Double.MinValue
+    for(p<-points) {
+      projectVector.x=p.x
+      projectVector.y=p.y
+      projectVector.z=0
+      projectVector.project(camera)
+      res.minX=scala.math.min(projectVector.x,res.minX)
+      res.maxX=scala.math.max(projectVector.x,res.maxX)
+      res.minY=scala.math.min(projectVector.y,res.minY)
+      res.maxY=scala.math.max(projectVector.y,res.maxY)
+    }
+  }
+
+
+  private[viewer2d] val projectVector=new Vector3()
+
+
+
 }

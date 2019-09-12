@@ -1,25 +1,27 @@
 package clientbase.tableview
 
 import clientbase.connection.{InstSubscriber, WebSocketConnector}
-import clientbase.control.SelectionController
-import definition.data.{InstanceData, OwnerReference, Reference}
+import clientbase.control.{CreateActionList, FocusContainer, SelectionController}
+import definition.data._
 import definition.typ.AllClasses
 import org.scalajs.dom
 import org.scalajs.dom.document
 import org.scalajs.dom.html.Paragraph
 import org.scalajs.dom.raw.HTMLElement
-import util.Log
 import scalatags.JsDom.all._
+import util.Log
 
 import scala.collection.mutable.ArrayBuffer
 
 /**
  * Created by Peter Holzer on 09.08.2015.
  */
-class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubscriber {
+class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubscriber with FocusContainer with Referencable {
 
   protected val propList: ArrayBuffer[PropertyModel] =collection.mutable.ArrayBuffer[PropertyModel]()
   var oldData:Seq[InstanceData]=Seq.empty
+  var lastFocusedTable:Option[TableModel]=None
+  var ref:Reference=EMPTY_REFERENCE
 
   override def onLoad(data: Iterator[InstanceData]): Unit = {
     oldData=data.toIndexedSeq
@@ -41,6 +43,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
 
   protected def loadPropFields(topRef:Reference):Unit = {
     SelectionController.deselect()
+    ref=topRef
     val prFields=AllClasses.get.getClassByID(topRef.typ).propFields
     def loop(prIx:Int):Unit= if(prIx<prFields.size){
       val propField=prFields(prIx)
@@ -68,7 +71,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
         contentNode.appendChild(rowDiv)
         val divNode=div(`class`:="prfielddiv").render
         contentNode.appendChild(divNode)
-        val propModel=new PropertyModel(topRef,prIx,contentNode,subsID,()=>{loop(prIx+1)},propField.single,propField.allowedClass)
+        val propModel=new PropertyModel(topRef,prIx,contentNode,subsID,()=>{loop(prIx+1)},propField.single,propField.allowedClass,this)
         propList+=propModel
         WebSocketConnector.createSubscription(topRef,prIx,propModel)
       } else loop(prIx+1)
@@ -123,5 +126,22 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
       println("changed:"+oldData.mkString("|"))
       intUpdate()
     }
+  }
+
+  def containerFocused(atable:Option[TableModel],curPropertyField:Int):Unit = {
+    atable match {
+      case a @ Some(_) => lastFocusedTable = a
+      case _ =>
+    }
+    CreateActionList.containerFocused(this,curPropertyField)
+  }
+
+  override def containerName: String = ""
+
+  override def getOwnerRef: Option[Referencable] = Some(this)
+
+  override def requestFocus(): Unit = lastFocusedTable match {
+    case Some(atable)=> atable.requestFocus()
+    case _=>
   }
 }

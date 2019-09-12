@@ -3,23 +3,24 @@ package clientbase.viewer2d
 import java.io.DataInput
 
 import clientbase.connection.WebSocketConnector
+import clientbase.control.SelectionController
 import clientbase.localstore.{SingleInstanceSubs, SubsMap}
-import definition.data.{DimensionPoint, InstanceData, OwnerReference, Reference}
+import definition.data._
 import definition.expression.Expression
 import definition.typ.SelectGroup
 import org.scalajs.dom.html.{Button, Image, TableCell, TableRow}
 import org.scalajs.dom.raw.MouseEvent
+import scalatags.JsDom.all._
 import util.Log
 
 import scala.scalajs.js
 import scala.util.control.NonFatal
-import scalatags.JsDom.all._
 
 
 /**
   * Created by Peter Holzer on 11.02.2017.
   */
-class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) extends SubsMap[GraphElem] {
+class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) extends SubsMap[GraphElem] with Referencable {
   var visible = false
   var editable = false
   var scaleID:Int=1
@@ -29,15 +30,18 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
   val eyeIcon: TableCell = td(onclick := { _: MouseEvent => toggleVisibility() })(img(src := "eye.gif")).render
   val editIcon: TableCell = td(onclick := { _: MouseEvent => toggleEditable() })(img(src := "editsmall.gif")).render
   val newElemIcon: Image = img(src := "newElem.gif").render
-  val newElemPlace: TableCell = td(onclick := { (_: MouseEvent) => setActive() }).render
+  val newElemPlace: TableCell = td(onclick := { _: MouseEvent => setActive() }).render
 
-  val removeBut: Button = button(onclick := { (_: MouseEvent) =>
+  private var _ref:Reference=_
+  def ref: Reference =_ref
+
+  val removeBut: Button = button(onclick := { _: MouseEvent =>
     controller.layerList.removeLayer(this)  })("X").render
 
   val row: TableRow = if (WebSocketConnector.editable) tr(`class` := "layertable-row")(eyeIcon, editIcon, newElemPlace, numCell, nameCell, scaleCell, removeBut).render
                       else tr(`class` := "layertable-row")(eyeIcon, numCell, nameCell, scaleCell, removeBut).render
 
-  val instSubscriber = new SingleInstanceSubs((inst) => {
+  val instSubscriber = new SingleInstanceSubs(inst => {
     //println("Insubscriber update "+inst)
     numCell.innerHTML = inst.fieldValue(0).toString
     nameCell.innerHTML = inst.fieldValue(1).toString
@@ -47,13 +51,17 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
 
   lazy val ownerReference = new OwnerReference(0.toByte, layerRef)
 
+  override def load(parentRef: Reference, propField: Int, doneListener: () => Unit): Unit = {
+    _ref=parentRef
+    super.load(parentRef,propField,doneListener)
+  }
+
   override def factory(in: DataInput): GraphElem = try {
-      val ref = Reference(in)
-      ref.typ match {
+      val itemRef = Reference(in)
+      itemRef.typ match {
         case GraphElem.LINETYPE =>
           val nfields = in.readByte
-          //print("create Line "+ref+" fields:"+nfields)
-          if (nfields != 5) util.Log.e("Line wrong number of fields " + nfields + " " + ref)
+          if (nfields != 5) util.Log.e("Line wrong number of fields " + nfields + " " + itemRef)
           val color = Expression.readConstant(in)
           val lineWidth = Expression.read(in).getValue
           val lineStyle = Expression.read(in).getValue
@@ -62,11 +70,11 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val owners = InstanceData.readOwners(in)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
-          LineElement(ref, color.toInt, lineWidth.toInt, lineStyle.toInt, startPoint, endPoint)
+          LineElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, startPoint, endPoint)
 
         case GraphElem.ARCTYPE =>
           val nfields = in.readByte
-          if (nfields != 7) util.Log.e("Arc wrong number of fields " + nfields + " " + ref)
+          if (nfields != 7) util.Log.e("Arc wrong number of fields " + nfields + " " + itemRef)
           val color = Expression.read(in).getValue
           val lineWidth = Expression.read(in).getValue
           val lineStyle = Expression.read(in).getValue
@@ -77,11 +85,11 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val owners = InstanceData.readOwners(in)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
-          ArcElement(ref, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, diameter, startA, endA)
+          ArcElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, diameter, startA, endA)
 
         case GraphElem.ELLIPSETYP ⇒
           val nfields = in.readByte
-          if (nfields != 9) util.Log.e("Ellipse wrong number of fields " + nfields + " " + ref)
+          if (nfields != 9) util.Log.e("Ellipse wrong number of fields " + nfields + " " + itemRef)
           val color = Expression.read(in).getValue
           val lineWidth = Expression.read(in).getValue
           val lineStyle = Expression.read(in).getValue
@@ -94,10 +102,10 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val owners = InstanceData.readOwners(in)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
-          EllipseElement(ref, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, r1, r2, mainAngle, startA, endA)
+          EllipseElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, r1, r2, mainAngle, startA, endA)
         case GraphElem.TEXTTYP =>
             val nfields=in.readByte
-            if(nfields!=10) util.Log.e("Line wrong number of fields "+nfields+" "+ref)
+            if(nfields!=10) util.Log.e("Line wrong number of fields "+nfields+" "+itemRef)
             val color=Expression.read(in).getValue.toInt
             val text=Expression.read(in).getValue.toString
             val pos=Expression.read(in).getValue.toVector
@@ -111,11 +119,12 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
             InstanceData.readOwners(in)
             InstanceData.readSecondUseOwners(in)
             in.readBoolean
-            TextElement(ref,color,text,pos,font,height,widthr,align,tangle,obAngle,lineSpace)
+            //println("load text "+ref+" "+text)
+            TextElement(itemRef,color,text,pos,font,height,widthr,align,tangle,obAngle,lineSpace)
         case GraphElem.DIMLINETYP =>
             val nfields=in.readByte
-            if(nfields!=8) util.Log.e("DimLine wrong number of fields "+nfields+ " "+ref)
-            else println("Dimline "+nfields)
+            if(nfields!=8) util.Log.e("DimLine wrong number of fields "+nfields+ " "+itemRef)
+            //else println("Dimline "+nfields)
             val color=Expression.read(in).getValue.toInt
             val position=Expression.read(in).getValue.toVector
             val style=Expression.read(in).getValue.toInt
@@ -127,9 +136,38 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
             InstanceData.readOwners(in)
             InstanceData.readSecondUseOwners(in)
             in.readBoolean
-            new DimLineElement(ref,color,position,style,angle,refPoint,refDist,precision,points)
+            new DimLineElement(itemRef,color,position,style,angle,refPoint,refDist,precision,points)
+        case GraphElem.FILLTYPE =>
+          val nfields = in.readByte
+          if (nfields != 8) util.Log.e("Poly wrong number of fields " + nfields + " " + itemRef)
+          val color = Expression.read(in).getValue.toInt
+          val lineWidth = Expression.read(in).getValue.toInt
+          val lineStyle = Expression.read(in).getValue.toInt
+          val points = Expression.readConstant(in).getValue.toPolygon
+          val fill = Expression.read(in).getValue.toInt
+          val hatch = Expression.read(in).getValue.toInt // positive value: world scale, negative value: paperScale
+          val startPoint = Expression.read(in).getValue.toVector
+          val angle = Expression.read(in).getValue.toDouble
 
-        case _ => InstanceData.readWithChildInfo(ref, in); new GraphElemStub(ref)
+          InstanceData.readOwners(in)
+          InstanceData.readSecondUseOwners(in)
+          in.readBoolean
+          new FillElement(itemRef,color,lineWidth,lineStyle,fill,Math.abs(hatch),hatch < 0,points,startPoint,angle)
+
+        case GraphElem.SYMBOLTYP=>
+            val nfields=in.readByte
+            if(nfields!=6) util.Log.e("Symbol wrong number of fields "+nfields+ " "+itemRef)
+            val color=Expression.read(in).getValue.toInt
+            val stampRef=Expression.read(in).getValue.toObjectReference
+            val angle=Expression.read(in).getValue.toDouble
+            val scale=Expression.read(in).getValue.toDouble
+            val paramString=Expression.read(in).getValue.toString
+            val pos=Expression.read(in).getValue.toVector
+            InstanceData.readOwners(in)
+            InstanceData.readSecondUseOwners(in)
+            in.readBoolean
+            new SymbolElem(itemRef,color,stampRef,angle,scale,pos,paramString)
+        case _ => InstanceData.readWithChildInfo(itemRef, in); new GraphElemStub(itemRef)
       }
     } catch {
       case NonFatal(e)  => Log.e("factory ",e);null
@@ -163,7 +201,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
 
   override def destructor(elem: GraphElem): Unit = {
     for(o<-elem.geometry)
-    controller.canvasHandler.removeGeometry(o)
+      controller.canvasHandler.removeGeometry(o)
     super.destructor(elem)
   }
 
@@ -174,20 +212,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
 
 
   def bounds:BRect= {
-    var x1:Double=Short.MaxValue
-    var y1:Double=Short.MaxValue
-    var x2:Double=Short.MinValue
-    var y2:Double=Short.MinValue
-    for(el<-map.valuesIterator) el match {
-      case _:GraphElemStub=>
-      case g:GraphElem=>
-        val l=g.getBounds(controller)
-        if(l.minX<x1) x1=l.minX
-        if(l.minY<y1) y1=l.minY
-        if(l.maxX>x2) x2=l.maxX
-        if(l.maxY>y2) y2=l.maxY
-    }
-    BRect(x1,y1,x2,y2)
+    GraphElem.calcBounds(map.valuesIterator,controller)
   }
 
   def toggleVisibility(): Unit = controller.layerList.toggleVisibility(this)
@@ -217,6 +242,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     controller.canvasHandler.repaint()
     eyeIcon.style.background = "white"
     visible = false
+    SelectionController.ownerInvisible(layerRef)
     setEditable(false)
   }
 
@@ -232,11 +258,18 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     controller.scaleModel.setRelativeScaleID(scaleID)
   }
 
+
+  /**
+  * returns a SelectGroup object containing all elements of the map that have the same reference as in the intersection array
+  * if there are no matching elements, it returns None
+*/
   def filterSelection(intersection: js.Array[Reference]): Option[SelectGroup[GraphElem]] = {
     val elemsInLayer: js.Array[GraphElem] = intersection.filter(map.contains).map(map)
-    println("layer " + layerRef + " elems:" + elemsInLayer.mkString(" ,"))
+    //println("layer " + layerRef + " elems:" + elemsInLayer.mkString(" ,"))
     if (elemsInLayer.length == 0) None
     else Some(SelectGroup(ownerReference, elemsInLayer))
   }
+
+  def filterElements(filterFunc:GraphElem=>Boolean): Iterable[GraphElem] = map.values.filter(filterFunc)
 
 }

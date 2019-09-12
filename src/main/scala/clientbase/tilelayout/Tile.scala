@@ -1,13 +1,13 @@
 package clientbase.tilelayout
 
 import definition.data.Referencable
-import org.scalajs.dom.html.{Button, Div, Paragraph}
+import org.scalajs.dom.html.{Button, Div}
 import org.scalajs.dom.raw.{HTMLElement, MouseEvent, TouchEvent}
 import org.scalajs.dom.{document, window}
+import scalatags.JsDom.all._
 import util.Log
 
 import scala.util.control.NonFatal
-import scalatags.JsDom.all._
 
 /**
   * Created by Peter Holzer on 22.01.2017.
@@ -290,7 +290,7 @@ class Tile(nparentTile:Option[Tile]=None, val isTop:Boolean=false) {
         proportion = (pos - delta + 6) / parentH
         updateLayout()
         e.stopPropagation()
-        e.preventDefault()
+        //e.preventDefault()
       }
       document.addEventListener("touchmove", moveFunc, useCapture = false)
 
@@ -345,7 +345,7 @@ class Tile(nparentTile:Option[Tile]=None, val isTop:Boolean=false) {
       proportion = (pos - delta + 6) / parentW
       updateLayout()
       e.stopPropagation()
-      e.preventDefault()
+      //e.preventDefault()
     }
     document.addEventListener("touchmove",moveFunc,useCapture = false)
 
@@ -427,7 +427,7 @@ class EdgeSensorRight(cssClass:String,hor:Boolean,funcIn:()=>Unit,funcOut:()=>Un
       myDiv.removeEventListener("touchmove",touchmove)
         myDiv.parentElement.appendChild(p("open").render)
       funcIn()
-      e.preventDefault()
+      //e.preventDefault()
       e.stopPropagation()
       startx= -1
       startx2= -1
@@ -437,7 +437,7 @@ class EdgeSensorRight(cssClass:String,hor:Boolean,funcIn:()=>Unit,funcOut:()=>Un
         myDiv.removeEventListener("touchmove",touchmove)
         funcOut()
         myDiv.parentElement.appendChild(p("close").render)
-        e.preventDefault()
+        //e.preventDefault()
         e.stopPropagation()
         startx= -1
         startx2= -1
@@ -455,7 +455,7 @@ class EdgeSensorRight(cssClass:String,hor:Boolean,funcIn:()=>Unit,funcOut:()=>Un
         startx2 = if (hor) secondItem.clientX else secondItem.clientY
         myDiv.addEventListener("touchmove", touchmove)
         //myDiv.appendChild(p("1:"+startx+" 2:"+startx2).render)
-        e.preventDefault()
+        //e.preventDefault()
         e.stopImmediatePropagation()
       }
     }

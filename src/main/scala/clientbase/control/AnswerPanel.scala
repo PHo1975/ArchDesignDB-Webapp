@@ -1,26 +1,27 @@
 package clientbase.control
 
-import definition.expression.{ Constant, DoubleConstant, IntConstant, StringConstant }
+import definition.expression.{Constant, DoubleConstant, IntConstant, StringConstant}
 import definition.typ.AnswerDefinition
-import org.scalajs.dom.html.Div
+import org.scalajs.dom.html.{Div, Span}
 import org.scalajs.dom.raw.Node
-import util.{ StrToDouble, StrToInt }
 import scalatags.JsDom.all._
+import util.{StrToDouble, StrToInt}
 
 /**
   * Created by Peter Holzer on 17.01.2016.
   */
 abstract class AnswerPanel {
-  val panel: Div = div(`class` := "answer-panel").render
+  protected val panel: Div = div(`class` := "answer-panel").render
+  val infoLabel: Span = span(`class`:="answer-label").render
+  panel.appendChild(infoLabel)
   var answerDefinition:AnswerDefinition= _
 
-  def loadAnswerParam(nanswerDefinition: AnswerDefinition): Any = {
+  def loadAnswerParam(nanswerDefinition: AnswerDefinition): Node = {
     answerDefinition=nanswerDefinition
     if(answerDefinition.name.length>0) {
-      val infoLabel = span(`class`:="answer-label").render
       infoLabel.innerHTML=answerDefinition.name
-      panel.appendChild(infoLabel)
     }
+    panel
   }
 
   def reset():Unit
@@ -38,6 +39,7 @@ class StringAnswerPanel extends AnswerPanel {
   override def loadAnswerParam(nanswerDefinition: AnswerDefinition): Node = {
     super.loadAnswerParam(nanswerDefinition)
     panel.appendChild(inputField)
+    panel
   }
 
 

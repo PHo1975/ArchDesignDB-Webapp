@@ -1,0 +1,201 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+ /* -webkit-touch-callout: none ;
+ -webkit-user-select: none;
+ -moz-user-select: none;*/
+}
+
+[draggable] {
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Required to make elements draggable in old WebKit */
+  -khtml-user-drag: none;
+  -webkit-user-drag: none;
+}
+
+*:not(input):not(textarea) {
+  -webkit-user-select: none; /* disable selection/Copy of UIWebView */
+  -webkit-touch-callout: none; /* disable the IOS popup when long-press on a link */
+}
+
+p{
+  margin: 0;
+  padding: 5px;
+
+}
+
+.tile-single-content{
+    width: calc( 100% - 34px);
+    height: calc( 100% - 34px);
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 4px 30px 30px 4px;
+}
+
+.tile-left{
+   position: absolute;
+       height: calc(100% - 34px);
+       left: 0;
+       top: 0;
+       padding: 4px 30px 30px 4px;
+       overflow-x: auto;
+}
+
+.tile-right{
+   position: absolute;
+   height: calc(100% - 34px);
+   right: 0;
+   top: 0;
+   padding: 4px 30px 30px 4px;
+   overflow-x: auto;
+}
+
+.tile-top{
+    position: absolute;
+    width: calc(100% - 34px);
+    right: 0;
+    top: 0;
+    padding: 4px 30px 30px 4px;
+    overflow-y: auto;
+}
+
+.tile-bottom{
+  position: absolute;
+  width: calc(100% - 34px);
+  left: 0;
+  bottom: 0;
+  padding: 4px 30px 30px 4px;
+  overflow-y: auto;
+}
+
+.tile-vdrag{
+  position: absolute;
+    left: 0px;
+    height: 8px;
+    width: 100%;
+    background-color: lightgray;
+    cursor: row-resize;
+    margin:0;
+    padding:0;
+}
+
+.tile-hdrag{
+  position: absolute;
+      top: 0px;
+      height: 100%;
+      width: 8px;
+      background-color: lightgray;
+      cursor: col-resize;
+      margin:0;
+      padding:0;
+}
+
+.tile-tr-button{
+    width: 25px;
+    height:25px;
+    padding: 4px 3px 4px 3px;
+    font-size:0.6em;
+    margin: 0;
+    border-width:1px;
+}
+
+.viewer2dbuttonbar button{
+  border-width:1px;
+}
+
+.tile-bl-button{
+     width: 25px;
+     font-size:0.6em;
+     height:25px;
+     margin: 0;
+     padding: 3px 4px 3px 4px;
+}
+
+.tile-button-group-right{
+ position:absolute;
+ right:2px;
+ top:4px;
+ width:25px;
+ padding:0;
+ margin:0;
+}
+
+.tile-button-group-bottom{
+ position:absolute;
+ left:4px;
+ bottom:4px;
+ height:25px;
+ padding:0;
+ margin:0;
+}
+
+.tile-slide-right {
+  position:absolute;
+  right:0px;
+  top:0px;
+  height: 0px;
+  margin: 0;
+  padding:0;
+  width:0px;
+}
+
+.tile-slide-bottom {
+  position:absolute;
+  left: 0px;
+  bottom: 0px;
+  width: 0px;
+  margin: 0;
+  padding:0;
+  height: 0px;
+}
+
+@media only screen and (max-device-width: 1100px) {
+
+.tile-slide-right {
+  position:absolute;
+  right:0px;
+  top:80px;
+  height: calc(100% - 86px);
+  margin: 0;
+  padding:0;
+  width:50px;
+}
+
+.tile-slide-bottom {
+  position:absolute;
+  left: 30px;
+  bottom: 0px;
+  width: calc(100% - 40px);
+  margin: 0;
+  padding:0;
+  height:50px;
+}
+
+.tile-vdrag{
+  position: absolute;
+    left: 0px;
+    height: 15px;
+    width: 100%;
+    background-color: lightgray;
+    cursor: row-resize;
+    margin:0;
+    padding:0;
+}
+
+.tile-hdrag{
+      position: absolute;
+      top: 0px;
+      height: 100%;
+      width: 15px;
+      background-color: lightgray;
+      cursor: col-resize;
+      margin:0;
+      padding:0;
+}
+
+}

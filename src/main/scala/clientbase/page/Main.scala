@@ -3,7 +3,7 @@ package clientbase.page
 import clientbase.connection.WebSocketConnector
 import clientbase.control.SidepanelController
 import clientbase.tilelayout.{ContentFactory, Tile}
-import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, Viewer2DController}
+import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, LineStyleHandler, Viewer2DController}
 import org.scalajs.dom.document
 import org.scalajs.dom.raw.HTMLElement
 import util.Log
@@ -28,6 +28,7 @@ object Main {
         GraphSettingsHandler.setup()
         println("setup")
         DimLineStyleHandler.init()
+        LineStyleHandler.init()
         println("init")
         document.body.removeChild(statusLine)
         val sidepanelRoot = document.getElementById("sidepanel").asInstanceOf[HTMLElement]

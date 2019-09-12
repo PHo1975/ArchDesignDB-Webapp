@@ -3,10 +3,11 @@ package clientbase.control
 import clientbase.connection.WebSocketConnector
 import definition.typ.ActionTrait
 import org.scalajs.dom.html._
-import org.scalajs.dom.raw.{ HTMLElement, MouseEvent }
+import org.scalajs.dom.raw.{HTMLElement, MouseEvent}
+import scalatags.JsDom.all._
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scalatags.JsDom.all._
 
 /**
   * Created by Peter Holzer on 12.12.2015.
@@ -25,11 +26,11 @@ object SidepanelController {
   var open=false
   val selCheck: Input = input(`type` := "checkbox", id := "multiSelectCheck", float := "right").render
   selCheck.onclick=(_:MouseEvent)=>{multiSelectMode=selCheck.checked}
-  val selectionHeader: Div = div(label(`class` := "label", float := "left")("Auswahl:  "), selCheck, label(`class` := "label", `for` := "multiSelectCheck", float := "right")("mehrfach")).render
-  val selectionLabel: Span = span(`class` := "label", width := "100%", backgroundColor := "#f6f6f6", float := "left")(" - ").render
-  val selectionArea: Div =div(`class`:="sidepanelpart")(selectionHeader,selectionLabel).render
-  val actionLabel: Label = label(`class` := "label", float := "left")("Aktionen:").render
-  val actionArea: Div =div(`class`:="sidepanelpart",id:="action")(actionLabel).render
+  val selectionHeader: Div = div(id:="selheader",`class`:="sel-panel")(label(`class` := "label", float := "left")("Auswahl:  "), selCheck, label(`class` := "label", `for` := "multiSelectCheck", float := "right")("mehrfach")).render
+  val selectionLabel: Span = span(`class` := "widelabel", backgroundColor := "#f6f6f6")(" - ").render
+  val selectionArea: Div =div(id:="selarea",`class`:="sidepanelpart")(selectionHeader,selectionLabel).render
+  val actionLabel: Label = label(`class` := "widelabel")("Aktionen:").render
+  protected val actionArea: Div =div(id:="actionArea")(`class`:="sidepanelpart",id:="action")(actionLabel).render
 
   var currentActions:mutable.LinkedHashMap[String,ActionTrait]=mutable.LinkedHashMap.empty
   val messageLabel: Paragraph =p(`class`:="label")("-").render
@@ -69,25 +70,29 @@ object SidepanelController {
 
 
   switchButton.onclick= {e:MouseEvent=> {
-    println("switch onclick "+e)
+    //println("switch onclick "+e)
     if(open) {
       doClose()
       if (sidePanelRoot.contains(selectionArea)) sidePanelRoot.removeChild(selectionArea)
       if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
+      if (sidePanelRoot.contains(FieldEditorPanel.mainDiv))sidePanelRoot.removeChild(FieldEditorPanel.mainDiv)
       if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
     }
     else {
       doOpen()
       sidePanelRoot.appendChild(selectionArea)
-      sidePanelRoot.appendChild(actionArea)
+      sidePanelRoot.appendChild(FieldEditorPanel.mainDiv)
+      showActionArea()
     }
     open= !open
   }}
 
   def setSelection(text: String, actions: mutable.LinkedHashMap[String, ActionTrait]): Unit = {
-    //println("set selection "+text+" actions:"+actions.size)
+    println("set selection "+text+" actions:"+actions.size)
     if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
+
     if (open && !sidePanelRoot.contains(actionArea)) sidePanelRoot.appendChild(actionArea)
+    //sidePanelRoot.appendChild(FieldEditorPanel.mainDiv)
     currentActions=actions
     selectionLabel.innerHTML=text
     while (actionArea.childElementCount>1)
@@ -105,8 +110,13 @@ object SidepanelController {
   def addMessage(st: String): Unit = messageLabel.innerHTML = messageLabel.innerHTML + "<br>" + st
 
   def showAnswerPanel(): Unit = {
+    println("showAnswerPanel")
     doOpen()
+    FieldEditorPanel.hideFieldEditors()
     if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
     sidePanelRoot.appendChild(DialogManager.answerController.panel)
   }
+
+  def showActionArea():Unit=sidePanelRoot.appendChild(actionArea)
+
 }

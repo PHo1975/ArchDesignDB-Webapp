@@ -3,7 +3,8 @@ package clientbase.viewer2d
 import clientbase.connection.WebObjectClass
 import definition.expression.VectorConstant
 import definition.typ.AllClasses
-import util.{ ColonSplit, Log, StrToDouble }
+import util.{ColonSplit, Log, StrToDouble}
+
 import scala.collection.immutable.SortedMap
 
 /**

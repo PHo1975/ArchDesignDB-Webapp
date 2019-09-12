@@ -2,8 +2,7 @@ package clientbase.viewer2d
 
 import definition.data.{DimensionPoint, Reference}
 import definition.expression._
-import org.denigma.threejs.{Mesh, Object3D, ShapeGeometry}
-import util.{Log, StringUtils}
+import org.denigma.threejs.{Camera, Mesh, Object3D, ShapeGeometry}
 
 import scala.scalajs.js
 
@@ -54,6 +53,9 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
   }
 
   def getBounds(container: ElemContainer): BRect =bounds
+
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
+    GraphElem.calcScreenBoundsfrom2Points(firstInterPoint,lastInterPoint,camera,res)
 
   override def createGeometry(container: ElemContainer): Unit = {
     val meshName="D"+nref.instance.toString
@@ -109,7 +111,9 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
             val mesh = new Mesh(geom, GraphElem.getMaterial(color))
             mesh.position.x=ip.x
             mesh.position.y=ip.y
+            mesh.name=meshName
             container.addGeometry(mesh)
+            _geometry.push(mesh)
           }
 
         }

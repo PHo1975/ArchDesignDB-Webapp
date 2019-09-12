@@ -3,7 +3,7 @@ package clientbase.viewer2d
 import org.denigma.threejs._
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.{JSGlobal, ScalaJSDefined}
+import scala.scalajs.js.annotation.JSGlobal
 
 @js.native
 @JSGlobal("THREE.BufferGeometry")
@@ -38,6 +38,8 @@ class MyBufferGeometry extends Geometry {
 }
 
 
+
+
 @js.native
 @JSGlobal("THREE.PlaneBufferGeometry")
 class PlaneBufferGeometry extends Geometry {
@@ -51,15 +53,17 @@ class FontLoader extends js.Object {
   def load(url: String, onLoad: js.Function1[ThreeFont, Unit]):Unit = js.native
 }
 
-@ScalaJSDefined
+//@ScalaJSDefined
+@js.native
+@JSGlobal("THREE.TextGeometryParams")
 class TextGeometryParams extends js.Object{
-  var size: Double = 1
-  var height: Double =1
-  var curveSegments: Double=12
-  var font: ThreeFont = _
-  var bevelEnabled: Boolean = false
-  var bevelThickness: Double = 0
-  var bevelSize: Double = 0
+  var size: js.Any = js.native
+  var height: js.Any = js.native
+  var curveSegments: js.Any = js.native
+  var font: js.Any = js.native
+  var bevelEnabled: js.Any = js.native
+  var bevelThickness: js.Any = js.native
+  var bevelSize: js.Any = js.native
 }
 
 @js.native
@@ -71,4 +75,11 @@ class TextGeometry(text: String, textGeometryParameters: TextGeometryParams = js
 class ThreeFont extends js.Object {
   var data: js.Any = js.native
   def generateShapes ( text:String, size:Double, divisions:Int ):js.Array[js.Object]= js.native
+}
+
+@js.native
+@JSGlobal("THREE.ShapeBufferGeometry")
+class ShapeBufferGeometry extends BufferGeometry{
+  def this(shapes:js.Array[Shape], curveSegments:Int) = this()
+  var parameters: js.Any = js.native
 }

@@ -10,17 +10,20 @@ import definition.typ._
 import org.scalajs.dom
 import org.scalajs.dom.html.{Table, TableCell, TableHeaderCell, TableRow}
 import org.scalajs.dom.raw._
+import scalatags.JsDom.all._
 import util.{Log, StrToInt}
 
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
-import scalatags.JsDom.all._
+
+
+
 
 /**
  * Created by Peter Holzer on 05.07.2015.
  */
-class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyModel:PropertyModel,singleField:Boolean,showClassLabel:Boolean) extends FocusOwner {
+class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,propertyModel:PropertyModel,singleField:Boolean,showClassLabel:Boolean) extends FocusOwner {
   import TableModel._
 
   var dragIx:Int= -1
@@ -30,7 +33,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
   protected val numCols: Int = if (tableSettings.isEmpty) myClass.fields.size else tableSettings.count(s => myClass.fieldSetting(s.ix).visible)
   protected val myTable: Table = table(createHeader).render
 
-  var selection:TreeSet[Int]=TreeSet.empty
+  protected var selection:TreeSet[Int]=TreeSet.empty
   val selectionGroup=new SelectGroup[Reference](EMPTY_OWNERREF,Seq.empty)
 
   val selectionGroupList=List(selectionGroup)
@@ -130,7 +133,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
   def removeInstance(ref:Reference):Unit= {
     data.indexWhere(_.ref==ref) match {
-      case -1=> Log.e("Remove instance not found "+ref)
+      case -1=> Log.e("Remove instance  not found "+ref)
       case ix =>
         data.remove(ix)
         myTable.removeChild(myTable.childNodes.item(ix+1))
@@ -216,7 +219,7 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
   def renderRow(inst:InstanceData,row:Int): TableRow ={
     tr(refAttr:=inst.ref.sToString())(
     td(`class`:="firstcol")(
-      button(if(inst.hasChildren)"+" else " ",`class`:="frontbut"),
+      button(if(inst.hasChildren)"+" else " ",`class`:="frontbut",tabindex:= "-1"),
         onclick:={()=>{println("click "+inst.ref);WebSocketConnector.pathOpenChild(pathSubsID,inst.ref)}}),
     for(ix<- tableSettings.indices;colData =tableSettings(ix);fieldSetting=myClass.fieldSetting(colData.ix))yield
       renderCell(inst,ix,row,colData.ix,fieldSetting)
@@ -365,14 +368,16 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
   def blur():Unit={
     selection=TreeSet.empty
     clearSelectStyle()
+    SelectionController.cellEditor.blur()
   }
 
   // selection
 
   protected def notifySelection():Unit={
     selectionGroup.children= (for(s<-selection.iterator; if s<data.size) yield data(s).ref).toSeq
-    println("notify:"+selection.mkString(",")+"  "+selectionGroup.children.map(_.ref).mkString(","))
+    println("notify:"+selection.mkString(",")+"  "+ selectionGroup.children.map(_.ref).mkString(","))
     SelectionController.select(selectionGroupList)
+    propertyModel.focusGained(Some(this))
   }
 
   protected def selectInterval(start:Int, end:Int):Unit= {
@@ -400,16 +405,16 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
 
   protected def addSelectStyle(row:Int):Unit= {
     val rowData=myTable.childNodes.item(row+1)
-    for (col<-0 until numCols)rowData.childNodes.item(col+1).asInstanceOf[HTMLElement].classList.add("selection")
+    for (col<-0 until numCols;if(col+1) < rowData.childNodes.length)rowData.childNodes.item(col+1).asInstanceOf[HTMLElement].classList.add("selection")
   }
 
   protected def removeSelectStyle(row:Int):Unit= {
     val rowData=myTable.childNodes.item(row+1)
-    for (col<-0 until numCols)rowData.childNodes.item(col+1).asInstanceOf[HTMLElement].classList.remove("selection")
+    for (col<-0 until numCols;if(col+1) < rowData.childNodes.length)rowData.childNodes.item(col+1).asInstanceOf[HTMLElement].classList.remove("selection")
   }
 
   protected def clearSelectStyle():Unit= {
-    for (row<-data.indices;rowData=myTable.childNodes.item(row+1);col<-0 until numCols)
+    for (row<-data.indices;if(row+1) < myTable.childNodes.length;rowData=myTable.childNodes.item(row+1);col<-0 until numCols)
       rowData.childNodes.item(col+1).asInstanceOf[HTMLElement].classList.remove("selection")
   }
 
@@ -429,6 +434,9 @@ class TableModel(val index:Int,typ:Int,parentNode:Node,pathSubsID:Int,propertyMo
     SelectionController.setFocusedElement(this)
   }
 
+  def requestFocus():Unit = {
+    focusCell(focusedCol, focusedRow)
+  }
 }
 
 object TableModel {

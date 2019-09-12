@@ -1,7 +1,7 @@
 package clientbase.tableview
 
-import clientbase.connection.{InstSubscriber, Subscriber}
-import clientbase.control.{CellEditor, FocusOwner}
+import clientbase.connection.InstSubscriber
+import clientbase.control.FocusOwner
 import definition.data.{InstanceData, Reference}
 import definition.typ.AllClasses
 import org.scalajs.dom.raw.Node
@@ -13,7 +13,7 @@ import util.Log
  * Created by Peter Holzer on 05.07.2015.
  */
 class PropertyModel(val topRef:Reference,val propField:Int,parentNode:Node,pathSubsID:Int,callBack:()=>Unit,
-                    singleField:Boolean,allowedClass:Int) extends InstSubscriber {
+                    singleField:Boolean,allowedClass:Int,pathModel:PathModel) extends InstSubscriber {
 
 
   val tableModelList= new collection.mutable.LinkedHashMap[Int,TableModel]()
@@ -57,6 +57,14 @@ class PropertyModel(val topRef:Reference,val propField:Int,parentNode:Node,pathS
   def shutDown():Unit= {
     tableModelList.clear()
     unsubscribe()
+  }
+
+  def focusGained(table:Option[TableModel]): Unit ={
+    pathModel.containerFocused(table,propField)
+  }
+
+  def deselect(selectedType: Int): Unit = {
+    for(m <-tableModelList.valuesIterator;if m.typ != selectedType) m.blur()
   }
 
   def getPrevTable(toIx:Int):Option[FocusOwner]= if (toIx>0) tableModelList.values.find(_.index== toIx-1) else None

@@ -1,7 +1,7 @@
 package clientbase.viewer2d
 
 import clientbase.connection.WebSocketConnector
-import org.scalajs.dom.html.{ Div, Table, TableRow }
+import org.scalajs.dom.html.{Div, Table, TableRow}
 import scalatags.JsDom.all._
 
 /**

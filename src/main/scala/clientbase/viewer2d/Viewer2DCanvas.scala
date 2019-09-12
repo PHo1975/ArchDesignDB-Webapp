@@ -1,6 +1,6 @@
 package clientbase.viewer2d
 
-import clientbase.control.SelectionController
+import clientbase.control.{CreateActionList, FocusOwner, SelectionController}
 import definition.data.{EMPTY_REFERENCE, Reference}
 import org.denigma.threejs._
 import org.scalajs.dom
@@ -12,24 +12,25 @@ import util.{Log, StrToInt}
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.util.matching.Regex
+
 /**
   * Created by Peter Holzer on 11.02.2017.
   */
 
 object MouseButtons extends Enumeration {
-  val NONE = Value(0)
-  val LEFT = Value(1)
-  val RIGHT = Value(2)
-  val MIDDLE = Value(4)
+  val NONE: MouseButtons.Value = Value(0)
+  val LEFT: MouseButtons.Value = Value(1)
+  val RIGHT: MouseButtons.Value = Value(2)
+  val MIDDLE: MouseButtons.Value = Value(4)
 
   def getButton(i: Int): MouseButtons.Value =
     if ((i & 1) > 0) LEFT else if ((i & 2) > 0) RIGHT else if ((i & 4) > 0) MIDDLE else NONE
 }
 
-class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLElement, vertCross: HTMLElement,
-                     scaleModel: ScaleModel) {
+class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLElement, vertCross: HTMLElement, selectRectangle:HTMLElement,
+                     scaleModel: ScaleModel) extends FocusOwner {
   final val tresh = 2
-  val IntersectPattern: Regex = "([CELTD])(\\d+)".r
+  val IntersectPattern: Regex = "([CDEFLST])(\\d+)".r
   var isPainting=false
   var downButtons:Int=0
   var downX:Double=0
@@ -48,8 +49,11 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   val renderer = new WebGLRenderer(js.Dynamic.literal(alpha = true, clearColor = whiteColor, autoSize = false, antialias = true
   ).asInstanceOf[WebGLRendererParameters])
   val contextListener:scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent) => {e.preventDefault()}
-  val raycaster = new Raycaster()
+  val rayCaster = new Raycaster()
+  val pickTreshold=2
   val pickVector = new Vector2()
+  val selectDragTreshold=3
+  var isRectDragging:Boolean=false
 
   val wheelListener:scala.scalajs.js.Function1[WheelEvent, Unit]=(e: WheelEvent) => {
     //println("wheel "+e.deltaMode+" y:"+e.deltaY)
@@ -59,13 +63,15 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     e.stopPropagation()
   }
   val mouseDownListener:scala.scalajs.js.Function1[MouseEvent, Unit]= (e:MouseEvent)=>{
-    //println("click "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" "+e.ctrlKey)
+    println("click "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" "+e.ctrlKey)
+    notifyFocus()
+    canv.focus()
     downButtons=e.buttons
+    isRectDragging=false
     downX=e.clientX
     downY=e.clientY
     lastMouseX=e.clientX
     lastMouseY=e.clientY
-    controller.mouseClicked(MouseButtons.getButton(e.buttons), e.clientX, e.clientY, e.ctrlKey)
     e.preventDefault()
     e.stopPropagation()
   }
@@ -91,18 +97,46 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
       }
       e.stopPropagation()
       e.preventDefault()
+    } else if(downButtons== MouseButtons.LEFT.id) {
+      if(controller.controllerState==ControllerState.SelectElems) {
+        if(!isRectDragging && !inDistance(e.clientX,e.clientY,downX,downY,selectDragTreshold)) {
+          isRectDragging=true
+          selectRectangleVisible(true)
+          //println("Start Drag Rect downx:"+downX+" downy:"+downY)
+        }
+        if(isRectDragging) {
+          selectRectangle.style.left=(scala.math.min(e.clientX,downX)-currentBounds.left+4).toString+"px"
+          selectRectangle.style.width=scala.math.abs(e.clientX-downX).toString+"px"
+          selectRectangle.style.top=(scala.math.min(e.clientY,downY)-10).toString+"px"
+          selectRectangle.style.height= scala.math.abs(e.clientY-downY).toString+"px"
+        }
+      }
     }
 
   }
 
   val mouseUpListener:scala.scalajs.js.Function1[MouseEvent, Unit]= (e:MouseEvent)=>{
-    //println("up "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" "+e.ctrlKey)
+    //println("up "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" ctrl:"+e.ctrlKey+" isRectDragging:"+isRectDragging+" cbt:"+currentBounds.top)
     //e.stopPropagation()
     e.preventDefault()
+    if(isRectDragging) {
+      isRectDragging=false
+      selectRectangleVisible(false)
+      currentBounds = canv.getBoundingClientRect()
+      controller.rectDragCompleted((downX-currentBounds.left).toInt,(downY-currentBounds.top).toInt,(e.clientX-currentBounds.left).toInt,(e.clientY-currentBounds.top).toInt,e.ctrlKey,e.shiftKey)
+    } else
+      controller.mouseClicked(MouseButtons.getButton(downButtons), downX, downY, e.ctrlKey)
     downButtons=0
   }
 
   canv.appendChild(renderer.domElement)
+
+  def notifyFocus():Unit = {
+    SelectionController.setFocusedElement(this)
+    CreateActionList.containerFocused(controller,0)
+    canv.style.border="solid blue 1px"
+  }
+
 
   renderer.setClearColor(whiteColor, 0.4d)
   camera.position.z = 30
@@ -146,9 +180,10 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
         touchY1 = t1.clientY
         touchX2 = t2.clientX
         touchY2 = t2.clientY
-        e.preventDefault()
+        //e.preventDefault()
       case _ =>
     }
+    e.stopPropagation()
     e.preventDefault()
   })
 
@@ -242,7 +277,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
         }
       case _ =>
     }
-    e.preventDefault()
+    //e.preventDefault()
   })
 
   val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (_: TouchEvent) => {
@@ -251,8 +286,12 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
 
   canv.addEventListener("touchend", touchEndListener)
   canv.addEventListener("touchcangel", touchEndListener)
+  selectRectangleVisible(false)
 
   def getDir(d: Double): Int = if (Math.abs(d) <= tresh) 0 else if (d < 0d) -1 else 1
+
+
+  def selectRectangleVisible(visible:Boolean):Unit = selectRectangle.style.visibility=if(visible) "visible" else "hidden"
 
   def addGeometry(obj: Object3D): Unit = {
     if (obj != null)
@@ -292,7 +331,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
       horCross.style.left = "1px"
       vertCross.style.width = "1px"
       vertCross.style.top = (currentBounds.top + 10).toString + "px"
-      vertCross.style.height = "calc(100% - 70px)"
+      vertCross.style.height = "calc(100% - 120px)"
     }
     repaint()
   }
@@ -319,26 +358,60 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
 
   def pickElems(screenX: Double, screenY: Double): js.Array[Reference] = {
     val viewBonds = renderer.domElement.getBoundingClientRect()
-    pickVector.x = ((screenX - viewBonds.left) / viewBonds.width) * 2d - 1d
-    pickVector.y = 1d - ((screenY - viewBonds.top) / viewBonds.height) * 2d
-    raycaster.setFromCamera(pickVector, camera)
-    println("Raycaster line:"+raycaster.linePrecision)
-    val intersects = raycaster.intersectObjects(scene.children)
-    for (el ← intersects) yield el.`object`.name match {
-      case IntersectPattern(typString, StrToInt(inst)) ⇒
+    var testx=0d
+    var testy=0d
+    val resultSet= collection.mutable.Set[Reference]()
 
-        val typ = typString match {
-          case "L" ⇒ GraphElem.LINETYPE
-          case "C" ⇒ GraphElem.ARCTYPE
-          case "E" ⇒ GraphElem.ELLIPSETYP
-          case "T" => GraphElem.TEXTTYP
-          case "D" => GraphElem.DIMLINETYP
-          case o ⇒ Log.e("Unknown ElemTyp:" + o); 0
-        }
-        Reference(typ, inst)
-      case o ⇒ Log.e("wrong object name " + o); EMPTY_REFERENCE
+    def addElement(el:Intersection):Unit= {
+      el.`object`.name match {
+        case IntersectPattern(typString, StrToInt(inst)) ⇒
+
+          val typ = typString match {
+            case "C" ⇒ GraphElem.ARCTYPE
+            case "D" => GraphElem.DIMLINETYP
+            case "E" ⇒ GraphElem.ELLIPSETYP
+            case "F" => GraphElem.FILLTYPE
+            case "L" ⇒ GraphElem.LINETYPE
+            case "S" => GraphElem.SYMBOLTYP
+            case "T" => GraphElem.TEXTTYP
+            case o ⇒ Log.e("Unknown ElemTyp:" + o); 0
+          }
+          resultSet+= Reference(typ, inst)
+        case o ⇒ Log.e("wrong object name " + o); EMPTY_REFERENCE
+      }
     }
+
+    for(i<-0 to 4) {
+      i match {
+        case 0 => testx=screenX;testy=screenY
+        case 1 => testx=screenX+pickTreshold;testy=screenY
+        case 2 => testx=screenX-pickTreshold;testy=screenY
+        case 3 => testx=screenX;testy=screenY+pickTreshold
+        case 4 => testx=screenX;testy=screenY-pickTreshold
+      }
+      pickVector.x = ((testx - viewBonds.left) / viewBonds.width) * 2d - 1d
+      pickVector.y = 1d - ((testy - viewBonds.top) / viewBonds.height) * 2d
+
+      rayCaster.setFromCamera(pickVector, camera)
+      val intersects: js.Array[Intersection] = rayCaster.intersectObjects(scene.children)
+      //println("r "+i+" intersects:"+intersects.length)
+      for (el: Intersection ← intersects) addElement(el)
+    }
+    val result=new js.Array[Reference]
+    for(el<-resultSet) result.push(el)
+    result
   }
+
+  def inDistance(x1:Double,y1:Double,x2:Double,y2:Double,distance:Double): Boolean =
+    scala.math.abs(x1-x2)<distance && scala.math.abs(y1-y2)<distance
+
+
+  def blur():Unit ={
+    canv.blur()
+    canv.style.removeProperty("border")
+    repaint()
+  }
+
 
 
 }

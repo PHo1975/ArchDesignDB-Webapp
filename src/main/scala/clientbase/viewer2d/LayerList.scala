@@ -1,8 +1,9 @@
 package clientbase.viewer2d
 
-import definition.data.{ Referencable, Reference }
+import definition.data.{Referencable, Reference}
 import definition.typ.SelectGroup
 import util.Log
+
 import scala.collection.mutable.ArrayBuffer
 import scala.scalajs.js
 
@@ -13,7 +14,6 @@ class LayerList(controller:Viewer2DController) {
 
   val subscriberList: ArrayBuffer[LayerSubscriber] =ArrayBuffer[LayerSubscriber]()
   var loaded=false
-
   var activeLayer: Option[LayerSubscriber] = None
 
   def loadLayers(nlist:Iterable[Referencable ]):Unit= {
@@ -118,8 +118,22 @@ class LayerList(controller:Viewer2DController) {
     }
   }
 
-  def decodeSelection(intersection: js.Array[Reference]): Seq[SelectGroup[_ <: Referencable]] =
+  /**
+  * creates a List of SelectGroup Objects for each Layer containing Objects from the intersection list
+*/
+  def decodeSelection(intersection: js.Array[Reference]): Seq[SelectGroup[GraphElem]] =
     editableLayers.flatMap(_.filterSelection(intersection)).toSeq
 
+
+  def filterElements(onlyEdible:Boolean,filterFunc:GraphElem=>Boolean):Seq[SelectGroup[GraphElem]]= {
+    val ret1 = subscriberList.flatMap(a=>
+      if(onlyEdible && !a.editable) Seq.empty
+      else {
+        val list: Iterable[GraphElem] =a.filterElements(filterFunc)
+        if (list.isEmpty) Seq.empty
+        else List(SelectGroup(a.ownerReference,list))
+    } )
+    ret1
+  }
 
 }

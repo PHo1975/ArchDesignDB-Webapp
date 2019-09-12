@@ -1,7 +1,7 @@
 package clientbase.viewer2d
 
 import clientbase.connection.{WebSocketConnector, WebSystemSettings}
-import definition.data.{InstanceData, Reference}
+import definition.data.{InstanceData, LineStyle, Reference}
 import definition.typ.SystemSettings
 
 import scala.collection.mutable.ArrayBuffer
@@ -19,8 +19,8 @@ object GraphSettingsHandler {
       mainFolders=data
       for(handler<-settingHandlers)
         getMainFolder(handler.name) match {
-          case Some(inst)=> handler.loadSettings(inst.ref)
-          case _=>
+          case Some(folderInst)=> handler.loadSettings(folderInst.ref)
+          case _=>println("setup Mainfolder not found "+handler.name)
         }
     })
   }
@@ -28,10 +28,11 @@ object GraphSettingsHandler {
   def registerHandler(handler:AbstractSettingHandler): Unit = {
     println("registerHandler:"+handler.name)
     settingHandlers+=handler
-    getMainFolder(handler.name) match {
-      case Some(inst)=> handler.loadSettings(inst.ref)
-      case _=>println("Mainfolder not found "+handler.name)
-    }
+    if(mainFolders.nonEmpty)
+      getMainFolder(handler.name) match {
+        case Some(inst)=> handler.loadSettings(inst.ref)
+        case _=>println("Mainfolder not found "+handler.name)
+      }
 
   }
 
@@ -42,7 +43,7 @@ object GraphSettingsHandler {
 
 
 trait AbstractSettingHandler {
-  def init(): Unit = GraphSettingsHandler.registerHandler(this)
+  def init(): Unit =  GraphSettingsHandler.registerHandler(this)
   def name:String
   def loadSettings(ref:Reference): Unit
   def shutDown(): Unit = {}
@@ -108,8 +109,8 @@ object DimLineStyleHandler extends AbstractSettingHandler {
     final val UnitM_MM=1
     final val DimLineHTextScale=0.75f
 
-    val Match1: Regex ="""(\d+[\.,]\d+)(\d)""".r
-    val Match2: Regex ="""(\d+)[\.,](\d)""".r
+    val Match1: Regex ="""(\d+[.,]\d+)(\d)""".r
+    val Match2: Regex ="""(\d+)[.,](\d)""".r
     var styleMap:collection.Map[Int,DimLineStyle]=Map.empty
     var defaultStyle:DimLineStyle=_
 
@@ -119,11 +120,33 @@ object DimLineStyleHandler extends AbstractSettingHandler {
           val d= new DimLineStyle(da)
           (d.id,d)
         }).toMap
+        if(styleMap.size>1)
+        defaultStyle=styleMap(1)
       })
-      defaultStyle=styleMap(1)
     }
 
     def getStyle(styleID:Int): DimLineStyle =if(styleMap.contains(styleID)) styleMap(styleID) else defaultStyle
 
     def getStyleSeq: Seq[DimLineStyle] =styleMap.values.toSeq
   }
+
+
+object LineStyleHandler extends AbstractSettingHandler {
+  //println("Start LineStyleHandler")
+  val undefinedStyle=new LineStyle(-1," - ",Array())
+  //val hoverStroke=new BasicStroke(3.5f)
+  val name="LineStyles"
+  var stylesList:Seq[LineStyle]=Seq.empty
+  //r standardStrokes:Seq[BasicStroke]=Seq.empty
+  var folderRef:Option[Reference]=None
+  init()
+  def styles: Seq[LineStyle] =stylesList
+
+  def loadSettings(ref:Reference): Unit = this.synchronized{//Swing.onEDT {
+    folderRef=Some(ref)
+    var i:Int= -1
+    WebSocketConnector.loadChildren(ref,1,data=> {
+      stylesList=data.map(ls=> {i+=1;new LineStyle(i,ls)})
+    })
+  }
+}

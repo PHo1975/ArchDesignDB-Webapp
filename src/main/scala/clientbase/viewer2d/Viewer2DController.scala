@@ -1,19 +1,20 @@
 package clientbase.viewer2d
 
-import clientbase.control.SelectionController
+import clientbase.connection.WebSocketConnector
+import clientbase.control.{FocusContainer, SelectionController}
 import clientbase.tilelayout.TileContent
 import definition.data.{Referencable, Reference}
+import definition.expression.{NULLVECTOR, VectorConstant}
 import definition.typ.SelectGroup
-import org.denigma.threejs.Object3D
-import org.scalajs.dom.html.{Button, Div, Select, Option => DomOption}
-import org.scalajs.dom.raw.{Event, HTMLElement, MouseEvent}
+import org.denigma.threejs.{Camera, Object3D, Vector3}
+import org.scalajs.dom.html.{Button, Div, Select}
+import org.scalajs.dom.raw.{ClientRect, Event, HTMLElement, MouseEvent}
+import scalatags.JsDom.all._
 import util.Log
 
 import scala.collection.mutable.ArrayBuffer
-import scala.util.control.NonFatal
-import scalatags.JsDom.all._
-
 import scala.scalajs.js
+import scala.util.control.NonFatal
 
 object ControllerState extends Enumeration {
   val SelectElems: ControllerState.Value = Value("Select")
@@ -25,11 +26,28 @@ object ControllerState extends Enumeration {
   val DragDrop: ControllerState.Value = Value("DragDrop")
 }
 
-/**
-  * Created by Peter Holzer on 11.02.2017.
-  */
-class Viewer2DController extends TileContent with ElemContainer {
+
+trait AbstractViewerController extends FocusContainer {
+  def focus():Unit
+  def resetPointSelection():Unit
+  def askForPoint():Unit
+  def bracketPointer:VectorConstant
+  def startBracketMode():Unit
+  def bracketMode:Boolean
+}
+
+
+
+class Viewer2DController extends AbstractViewerController with TileContent with ElemContainer {
   val layerPan = new LayerListPan(this)
+  var bracketPointer:VectorConstant=NULLVECTOR
+  var bracketMode:Boolean=false
+
+  lazy val neuSelect:Select = select(onchange := {e:Event  => {
+    createElement(neuSelect.selectedIndex)
+  }
+  })("Neu").render
+
   val zoomAllBut: Button = button(onclick := { _: MouseEvent => {
     zoomAll()
   }
@@ -38,20 +56,26 @@ class Viewer2DController extends TileContent with ElemContainer {
     layerPan.toggleVisibility()
   }
   })("Layer").render
+  val measureBut: Button = button(onclick := { _: MouseEvent => {
+
+  }
+  })("Measure").render
+
   val layerList=new LayerList(this)
   val scaleModel=new ScaleModel
   val scaleSelect: Select = select(`class` := "scales-combo").render
   val horCross: Div = div(`class`:="crosshairdivs").render
   val vertCross: Div = div(`class`:="crosshairdivs").render
-  val canvasHolder: Div = div(`class` := "viewer2dcanvas")(horCross, vertCross).render
+  val selectRectangle:Div = div(`class`:="selectrect").render
+  val canvasHolder: Div = div(`class` := "viewer2dcanvas",tabindex:="0")(horCross, vertCross,selectRectangle).render
   val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
 
   override val content: HTMLElement = div(`class`:="viewer2dcontent")(
     layerPan.pane,
-    div(`class` := "viewer2dbuttonbar")(layerListBut, zoomAllBut, if (SelectionController.supportsTouch) div() else scaleSelect),
+    div(`class` := "viewer2dbuttonbar")(if(WebSocketConnector.editable) neuSelect else div, layerListBut, zoomAllBut, if (SelectionController.supportsTouch) div() else scaleSelect),
     canvasHolder).render
 
-  val canvasHandler = new Viewer2DCanvas(this, canvasHolder, horCross, vertCross, scaleModel)
+  val canvasHandler = new Viewer2DCanvas(this, canvasHolder, horCross, vertCross,selectRectangle, scaleModel)
   var controllerState: ControllerState.Value = ControllerState.SelectElems
   //var movetime:Long=0
 
@@ -63,9 +87,7 @@ class Viewer2DController extends TileContent with ElemContainer {
     }
   }
 
-  def scaleRatio:Double= {
-    scaleModel.relativeScaleValue
-  }
+  def scaleRatio:Double=  scaleModel.relativeScaleValue
 
   def scaleToString(rel: Double): String = if (rel < 1) "1 : " + math.round(1d / rel) else math.round(rel) + " : 1"
 
@@ -77,10 +99,8 @@ class Viewer2DController extends TileContent with ElemContainer {
       case NonFatal(e) => Log.e("Init",e)
     }
 
-
   override def load(): Unit = {}
   override def save(): Unit = {}
-
 
   override def close(): Unit = {
     layerList.shutDown()
@@ -106,8 +126,8 @@ class Viewer2DController extends TileContent with ElemContainer {
 
   def zoomAll():Unit= {
     val bounds=layerList.calcBounds()
-    Log.e("zoomall size:"+layerList.subscriberList.size+" mx:"+bounds.minX+" my:"+bounds.minY+" max:"+bounds.maxX+
-    "maxy:"+bounds.maxY)
+    //Log.e("zoomall size:"+layerList.subscriberList.size+" mx:"+bounds.minX+" my:"+bounds.minY+" max:"+bounds.maxX+
+    //"maxy:"+bounds.maxY)
     if(bounds.maxX==Short.MaxValue.toDouble){ // no elements in layer, still max value
       //util.Log.w("ZoomAll bounds=null "+bounds)
       scaleModel.setWorldBounds(-1,-1,5,5)
@@ -133,15 +153,65 @@ class Viewer2DController extends TileContent with ElemContainer {
         controllerState match {
           case ControllerState.SelectElems ⇒
             val elems: js.Array[Reference] = canvasHandler.pickElems(screenx, screeny)
-            println("elems:" + elems.mkString(", "))
             val newSelection: Seq[SelectGroup[_ <: Referencable]] = layerList.decodeSelection(elems)
-            println("new selection:" + newSelection.mkString(", "))
-            SelectionController.select(newSelection)
+            if (controlKey) {SelectionController.addSelection(newSelection,toggle = true)}
+            else SelectionController.select(newSelection)
             dataUpdated()
           case _ ⇒
         }
       case _ ⇒
     }
+
+  def rectDragCompleted (startPointx:Int,startPointy:Int,endPointx:Int,endPointy:Int,controlKey:Boolean,shiftKey:Boolean): Unit ={
+    controllerState match {
+      case ControllerState.SelectElems=> checkSelection(startPointx,startPointy,endPointx,endPointy,controlKey)
+
+      case _ =>
+    }
+  }
+
+  def toScreenPosition(x:Double,y:Double,camera:Camera):Vector3 = {
+    val vector: Vector3 = new Vector3()
+    val viewBonds: ClientRect = canvasHandler.renderer.domElement.getBoundingClientRect()
+    val widthHalf= 0.5*viewBonds.width
+    val heightHalf= 0.5*viewBonds.height
+    //vector.setFromMatrixPosition(obj.matrixWorld)
+    vector.x=x
+    vector.y=y
+    vector.z=0
+    vector.project(camera)
+    vector.x=vector.x*widthHalf+widthHalf
+    vector.y= -vector.y*heightHalf+heightHalf
+    vector
+  }
+
+  def checkSelection(startPointx:Int,startPointy:Int,endPointx:Int,endPointy:Int,controlKey:Boolean): Unit = {
+    val viewBonds: ClientRect = canvasHandler.renderer.domElement.getBoundingClientRect()
+    val widthHalf= 0.5*viewBonds.width
+    val heightHalf= 0.5*viewBonds.height
+    val minX=scala.math.min(startPointx,endPointx)
+    val maxX=scala.math.max(startPointx,endPointx)
+    val minY=scala.math.min(startPointy,endPointy)
+    val maxY=scala.math.max(startPointy,endPointy)
+    val boundsContainer=new BoundsContainer
+    //println("Check Select minx:"+minX+" maxX:"+maxX+" miny:"+minY+" maxY:"+maxY)
+    val elList: Seq[SelectGroup[_ <: Referencable]] =layerList.filterElements(onlyEdible = true, graphElem=>{
+      graphElem.calcScreenBounds(this,canvasHandler.camera,boundsContainer)
+      if(! boundsContainer.isEmpty) {
+        val screenMinX = boundsContainer.minX * widthHalf + widthHalf
+        val screenMaxX = boundsContainer.maxX * widthHalf + widthHalf
+        val screenMaxY = -boundsContainer.minY * heightHalf + heightHalf
+        val screenMinY = -boundsContainer.maxY * heightHalf + heightHalf
+        //println("elem "+graphElem.ref+" MinX:"+screenMinX+" MaxX:"+screenMaxX+" minY:"+screenMinY+" maxY:"+screenMaxY)
+        screenMinX > minX && screenMaxX < maxX && screenMinY > minY && screenMaxY < maxY
+      } else false
+      //if(result) println("hit "+graphElem.ref+" MinX:"+screenMinX+" MaxX:"+screenMaxX+" minY:"+screenMinY+" maxY:"+screenMaxY)
+    })
+    if(elList.nonEmpty)
+      if(controlKey) SelectionController.addSelection(elList,toggle = false)
+      else SelectionController.select(elList)
+    dataUpdated()
+  }
 
 
   override def addGeometry(gr: Object3D): Unit = try {
@@ -151,4 +221,43 @@ class Viewer2DController extends TileContent with ElemContainer {
   } catch {
     case e: Throwable => Log.e("add geometry " + gr, e)
   }
+
+  def createElement(selectedIx:Int):Unit = {
+
+  }
+
+  def resetState(): Unit = {
+    controllerState match {
+      case ControllerState.AskPoint =>
+      case _ =>
+    }
+    controllerState=ControllerState.SelectElems
+    bracketMode=false
+    canvasHandler.repaint()
+  }
+
+  def focus():Unit = canvasHolder.focus()
+  def resetPointSelection():Unit = {
+     resetState()
+  }
+
+  def askForPoint():Unit = {
+    resetState()
+    controllerState=ControllerState.AskPoint
+    println("ask for point")
+  }
+
+  override def startBracketMode(): Unit = {
+    bracketMode=true
+  }
+
+  override def containerName: String = "Graph2DEdit"
+
+  override def getOwnerRef: Option[Referencable] =  layerList.activeLayer
+
+  override def requestFocus(): Unit = canvasHolder.focus()
+
+  override def actionStopped():Unit = resetState()
+
+  override def lostSelection():Unit =canvasHandler.repaint()
 }

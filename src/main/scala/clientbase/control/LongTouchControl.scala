@@ -1,11 +1,7 @@
 package clientbase.control
 
-import org.scalajs.dom.window
 import org.scalajs.dom.raw._
-
-import scala.scalajs.js
-import scala.scalajs.js.Dynamic
-import scala.scalajs.js.annotation.JSExport
+import org.scalajs.dom.window
 /**
  * Created by Peter Holzer on 24.09.2015.
  */

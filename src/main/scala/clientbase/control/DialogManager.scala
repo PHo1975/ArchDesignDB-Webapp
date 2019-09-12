@@ -1,9 +1,9 @@
 package clientbase.control
 
 import clientbase.connection.WebSocketConnector
-import definition.data.Referencable
 import definition.expression.Constant
 import definition.typ._
+
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -14,21 +14,21 @@ object DialogManager {
   var currentAction:Option[ActionTrait]=None
   var currentQuestion:Option[ParamQuestion]=None
   var repeatQuestion:Option[DialogQuestion]=None
-  var currentSelection:Iterable[SelectGroup[_ <: Referencable]]=Seq.empty
+  //var currentSelection:Seq[SelectGroup[_ <: Referencable]]=Seq.empty
   var isQuestionRepeating=false
+
+  def dialogIsActive: Boolean = currentQuestion.isDefined
 
   val answerController=new AnswerController()
   val answerList: ArrayBuffer[(String, Constant)] = scala.collection.mutable.ArrayBuffer[(String, Constant)]()
 
   def loadAction(newAction:ActionTrait):Unit={
     if(currentAction.isDefined)reset()
-    currentSelection=SelectionController.currentSelection
-    if(currentSelection.nonEmpty) {
+    if(SelectionController.currentSelection.nonEmpty) {
       currentAction=Some(newAction)
       newAction.question match {
         case Some(question) => loadQuestion(question)
-
-        case None => for(sg<-currentSelection) {
+        case None => for(sg<-SelectionController.currentSelection) {
           WebSocketConnector.executeAction(sg.parent,sg.children,newAction.name,Seq.empty)
           reset()
         }
@@ -47,12 +47,17 @@ object DialogManager {
   }
 
   def reset(): Unit = {
+    println("reset currentAction:"+currentAction+"\ncurrentSelection:"+SelectionController.currentSelection)
     for (_ <- currentAction) {
+      for(cl<-CreateActionList.lastContainer) cl.actionStopped()
       currentAction=None
-      SelectionController.select(currentSelection)
+      //SelectionController.select(currentSelection)
       currentQuestion=None
       isQuestionRepeating=false
       answerList.clear()
+      answerController.reset()
+      FieldEditorPanel.showFieldEditors()
+      SidepanelController.showActionArea()
     }
 
   }

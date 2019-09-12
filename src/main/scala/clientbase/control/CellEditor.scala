@@ -2,7 +2,7 @@ package clientbase.control
 
 import org.scalajs.dom.document
 import org.scalajs.dom.html.TextArea
-import org.scalajs.dom.raw.{ Event, HTMLElement, KeyboardEvent, Node }
+import org.scalajs.dom.raw.{Event, HTMLElement, KeyboardEvent, Node}
 import scalatags.JsDom.all._
 /**
  * Created by Peter Holzer on 18.09.2015.
@@ -112,4 +112,8 @@ class CellEditor {
   }
 
   def isEditing: Boolean = parentNode.isDefined
+
+  def blur():Unit = cell.blur()
+
+  def focus():Unit = cell.focus()
 }
