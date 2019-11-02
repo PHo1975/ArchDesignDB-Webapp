@@ -1,9 +1,9 @@
 package clientbase.control
 
-import clientbase.connection.WebSocketConnector
+import clientbase.connection.{WebObjectClass, WebSocketConnector}
 import clientbase.viewer2d.SelectionDecorable
-import definition.data.{OwnerReference, Referencable, Reference}
-import definition.typ.{AbstractObjectClass, AllClasses, SelectGroup}
+import definition.data.{EMPTY_OWNERREF, OwnerReference, Referencable, Reference}
+import definition.typ.{AbstractCCD, AbstractObjectClass, AllClasses, SelectGroup}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -15,14 +15,17 @@ import scala.collection.mutable.ArrayBuffer
 
 object SelectionController {
   val currentSelection:ArrayBuffer[SelectGroup[_ <: Referencable]]=ArrayBuffer.empty
-
   val cellEditor=new CellEditor
-
   var focusedElement:Option[FocusOwner]=None
-
   var commonClass:Option[AbstractObjectClass]=None
 
-  lazy val supportsTouch: Boolean = org.scalajs.dom.window.hasOwnProperty("ontouchstart")
+  var lastContainer:Option[FocusContainer]=None
+  var lastOwnerRef:Option[Referencable]=None
+  var lastPropField:Int= -1
+  var createChildDefs:Seq[AbstractCCD]=Seq.empty
+  private val selGroup=new SelectGroup[Referencable](EMPTY_OWNERREF,Seq[Referencable]())
+
+    lazy val supportsTouch: Boolean = org.scalajs.dom.window.hasOwnProperty("ontouchstart")
 
   def setFocusedElement(owner: FocusOwner): Unit = if (focusedElement.isEmpty || focusedElement.get != owner) {
     println("setFocusedElement "+owner+" focusedElem:"+focusedElement)
@@ -128,10 +131,10 @@ object SelectionController {
       case Some(c) =>
         SidepanelController.setSelection("" + numElems + " " +
           c.getDescriptionOrName + (if (numElems == 1) " -Objekt" else " -Objekte"+"<br>"+c.fieldEditors.mkString(", ")), c.actions)
-        FieldEditorPanel.loadFieldEditors(c,currentSelection)
+        SidepanelController.loadFieldEditors(c,currentSelection)
       case None =>
         SidepanelController.setSelection(" - ",mutable.LinkedHashMap.empty)
-        FieldEditorPanel.clearFieldEditors()
+        SidepanelController.clearFieldEditors()
     }
   }
 
@@ -163,6 +166,36 @@ object SelectionController {
     for(ix <-currentSelection.indices;cgroup=currentSelection(ix);if cgroup.parent.ownerRef==owner)
       currentSelection.remove(ix)
     updateCommonClassID()
+  }
+
+  def containerFocused(container:FocusContainer, propField:Int):Boolean =
+    if( lastContainer.isEmpty ||  !(container==lastContainer.get&&container.getOwnerRef==lastOwnerRef&&propField==lastPropField)) {
+      println("ContainerFocus "+container.getOwnerRef+" propField"+propField)
+
+      if(lastContainer.isDefined&& container!=lastContainer.get)lastContainer.get.lostSelection()
+      if (DialogManager.dialogIsActive) DialogManager.reset()
+      shutDown()
+      container.getOwnerRef match {
+        case Some(contRef) =>
+          val theClass = AllClasses.get.getClassByID(contRef.ref.typ).asInstanceOf[WebObjectClass]
+          if (theClass.propFields.size > propField) {
+            createChildDefs=theClass.propFields(propField).createChildDefs
+          } else util.Log.e("wrong propField " + propField + " for class " + theClass)
+          selGroup.children = List(contRef)
+        //println("set selgroup.children "+selGroup.children)
+        case None =>
+      }
+      lastContainer = Some(container)
+      lastPropField = propField
+      lastOwnerRef = container.getOwnerRef
+      true
+    }
+  else false
+
+  def focusLastContainer():Unit= for(cl<-lastContainer) cl.requestFocus()
+
+  def shutDown(): Unit ={
+
   }
 
 

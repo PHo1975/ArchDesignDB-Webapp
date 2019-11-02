@@ -5,9 +5,9 @@ import clientbase.control.{FocusContainer, SelectionController}
 import clientbase.tilelayout.TileContent
 import definition.data.{Referencable, Reference}
 import definition.expression.{NULLVECTOR, VectorConstant}
-import definition.typ.SelectGroup
+import definition.typ.{AbstractCCD, SelectGroup}
 import org.denigma.threejs.{Camera, Object3D, Vector3}
-import org.scalajs.dom.html.{Button, Div, Select}
+import org.scalajs.dom.html.{Button, Canvas, Div, Select}
 import org.scalajs.dom.raw.{ClientRect, Event, HTMLElement, MouseEvent}
 import scalatags.JsDom.all._
 import util.Log
@@ -26,7 +26,6 @@ object ControllerState extends Enumeration {
   val DragDrop: ControllerState.Value = Value("DragDrop")
 }
 
-
 trait AbstractViewerController extends FocusContainer {
   def focus():Unit
   def resetPointSelection():Unit
@@ -37,58 +36,22 @@ trait AbstractViewerController extends FocusContainer {
 }
 
 
-
 class Viewer2DController extends AbstractViewerController with TileContent with ElemContainer {
   val layerPan = new LayerListPan(this)
   var bracketPointer:VectorConstant=NULLVECTOR
   var bracketMode:Boolean=false
-
-  lazy val neuSelect:Select = select(onchange := {e:Event  => {
-    createElement(neuSelect.selectedIndex)
-  }
-  })("Neu").render
-
-  val zoomAllBut: Button = button(onclick := { _: MouseEvent => {
-    zoomAll()
-  }
-  })("Alles").render
-  val layerListBut: Button = button(onclick := { _: MouseEvent => {
-    layerPan.toggleVisibility()
-  }
-  })("Layer").render
-  val measureBut: Button = button(onclick := { _: MouseEvent => {
-
-  }
-  })("Measure").render
-
+  val toolbar=new Toolbar(this)
   val layerList=new LayerList(this)
   val scaleModel=new ScaleModel
-  val scaleSelect: Select = select(`class` := "scales-combo").render
-  val horCross: Div = div(`class`:="crosshairdivs").render
-  val vertCross: Div = div(`class`:="crosshairdivs").render
-  val selectRectangle:Div = div(`class`:="selectrect").render
-  val canvasHolder: Div = div(`class` := "viewer2dcanvas",tabindex:="0")(horCross, vertCross,selectRectangle).render
+  val canvasHolder: Div = div(`class` := "viewer2dcanvas",tabindex:="0")(/*horCross, vertCross,selectRectangle*/).render
   val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
 
-  override val content: HTMLElement = div(`class`:="viewer2dcontent")(
-    layerPan.pane,
-    div(`class` := "viewer2dbuttonbar")(if(WebSocketConnector.editable) neuSelect else div, layerListBut, zoomAllBut, if (SelectionController.supportsTouch) div() else scaleSelect),
-    canvasHolder).render
+  override val content: HTMLElement = div(`class`:="viewer2dcontent")(layerPan.pane,toolbar.toolbarDiv , canvasHolder).render
 
-  val canvasHandler = new Viewer2DCanvas(this, canvasHolder, horCross, vertCross,selectRectangle, scaleModel)
+  val canvasHandler = new Viewer2DCanvas(this, canvasHolder, scaleModel)
   var controllerState: ControllerState.Value = ControllerState.SelectElems
-  //var movetime:Long=0
-
-  for ((id, sc) <- ScaleModel.scales) scaleSelect.appendChild(option(attr("sid") := id.toString)(scaleToString(sc)).render)
-  scaleSelect.onchange = (_: Event) => {
-    scaleSelect.selectedIndex match {
-      case -1 =>
-      case ix => ScaleModel.scales(ix)
-    }
-  }
 
   def scaleRatio:Double=  scaleModel.relativeScaleValue
-
   def scaleToString(rel: Double): String = if (rel < 1) "1 : " + math.round(1d / rel) else math.round(rel) + " : 1"
 
   // init from parent Tile
@@ -115,10 +78,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     dataUpdated()
   }
 
-  def dataUpdated():Unit= if(layerList.loaded){
-    //Log.w("Update "+layerList.loaded)
-    canvasHandler.repaint()
-  }
+  def dataUpdated():Unit= if(layerList.loaded) canvasHandler.repaint()
 
   override def updateResize():Unit={
     canvasHandler.onResize()
@@ -222,9 +182,6 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     case e: Throwable => Log.e("add geometry " + gr, e)
   }
 
-  def createElement(selectedIx:Int):Unit = {
-
-  }
 
   def resetState(): Unit = {
     controllerState match {
@@ -251,6 +208,9 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     bracketMode=true
   }
 
+
+
+
   override def containerName: String = "Graph2DEdit"
 
   override def getOwnerRef: Option[Referencable] =  layerList.activeLayer
@@ -260,4 +220,6 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
   override def actionStopped():Unit = resetState()
 
   override def lostSelection():Unit =canvasHandler.repaint()
+
+
 }

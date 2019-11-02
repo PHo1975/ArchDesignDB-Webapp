@@ -328,7 +328,7 @@ flex-direction:column;
   padding:0;
 }
 
-.crosshairdivs{
+/*.crosshairdivs{
 	position: absolute;
 	z-index: 10000;
 	background-color: black;
@@ -345,7 +345,7 @@ flex-direction:column;
   	opacity: 0.5;
   	cursor:none;
   	pointer-events:none;
-}
+}*/
 
 .layerlisttable th{
   font-size:0.7em;
@@ -405,5 +405,15 @@ flex-direction:column;
 .point-answer-button{
   float:left;
   width:40px;
+}
+.hud-canvas {
+  width:99%;
+  height:100%;
+  margin:0;
+  padding:0;
+  z-index:120;
+  /*background-color:transparent;*/
+  overflow:hidden;
+  position:absolute;
 }
 

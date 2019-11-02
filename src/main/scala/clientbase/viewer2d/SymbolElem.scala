@@ -14,11 +14,12 @@ class SymbolElem(nref:Reference,ncolor:Int,stampRef:Reference,val angle:Double,v
   var _elemContainer:ElemContainer=_
   var _bounds:BRect=GraphElem.NULLRECT
   //println("Symbol ref:"+nref+" stamp:"+stampRef+" angle:"+angle+" pos:"+pos)
-  StampPool.loadSymbol(stampRef,angle,pos,data=>{
+  StampPool.loadSymbol(stampRef,angle,pos, (data: Seq[GraphElem]) =>{
     elems=data
     if(_elemContainer!=null) createGeometry(_elemContainer)
   })
 
+  protected var _pointsIterable:Iterable[VectorConstant]= _
   override def getBounds(container: ElemContainer): Bounds = _bounds
 
   override def createGeometry(container: ElemContainer): Unit = {
@@ -97,4 +98,30 @@ class SymbolElem(nref:Reference,ncolor:Int,stampRef:Reference,val angle:Double,v
 
   override def hideSelection(): Unit = for(el<-elems) el.hideSelection()
 
+  def createPointsIterable(container: ElemContainer): Iterable[VectorConstant] =
+    if (_pointsIterable==null) {
+      _pointsIterable=new Iterable[VectorConstant] {
+        def iterator: Iterator[VectorConstant] = if (elems.isEmpty) Nil.iterator else  new Iterator[VectorConstant]{
+          val elemIterator: Iterator[GraphElem] =elems.iterator
+          var currentElem: GraphElem =elemIterator.next()
+          var currentIterator:Iterator[VectorConstant]=currentElem.getHitPoints(container).iterator
+
+          override def hasNext: Boolean = if (currentIterator.hasNext) true
+          else {
+            var hasPoints=false
+            while(elemIterator.hasNext && ! hasPoints) {
+              currentElem=elemIterator.next()
+              currentIterator=currentElem.getHitPoints(container).iterator
+              hasPoints= currentIterator.hasNext
+            }
+            hasPoints
+          }
+
+          override def next(): VectorConstant = currentIterator.next
+        }
+      }
+      _pointsIterable
+    } else _pointsIterable
+
+  override def getHitPoints(container: ElemContainer): Iterable[VectorConstant] = createPointsIterable(container)
 }

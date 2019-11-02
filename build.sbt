@@ -5,7 +5,8 @@ lazy val root:Project= (project in file(".")).settings(
   scalaVersion := "2.12.9",
   //scalacOptions ++= Seq( "-deprecation -P:scalajs:sjsDefinedByDefault"),
   scalaJSStage in Global := FastOptStage,
-  artifactPath in (Compile,fastOptJS) := file("/media/platted/Programmdaten/Scalabase/deploy/Files/main.js")
+  artifactPath in (Compile,fastOptJS) := file("/media/platted/Programmdaten/Scalabase/deploy/Files/main.js"),
+  artifactPath in (Compile,fullOptJS) := file("/media/platted/Programmdaten/Scalabase/deploy/Files/main.js")
 ).enablePlugins(ScalaJSPlugin)
 scalaJSLinkerConfig := {
   val fastOptJSURI = (artifactPath in (Compile, fastOptJS)).value.toURI

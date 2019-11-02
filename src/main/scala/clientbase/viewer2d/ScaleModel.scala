@@ -49,28 +49,25 @@ trait Scaler {
 }
 
 
+
 class ScaleModel extends Scaler {
 
   def dotPitch: Double =ScaleModel._dotPitch
-
   val vpBorder = 10 // border of the Canvas
-
-  private var _viewSizeX = 1
   // size of the ViewPort component
+  private var _viewSizeX = 1
   private var _viewSizeY = 1
-
   private var zoomStack = collection.immutable.List[BRect]()
-
-  var _world_X: Double = _
   // pos of the ViewPort in real world dimensions
+  var _world_X: Double = _
   var _world_Y: Double = _
-  protected var _world_Width: Double = 1
   // size of the ViewPort in real world dimensions
+  protected var _world_Width: Double = 1
   protected var _world_Height: Double = 1
-  protected var _heightSet: Boolean = _
   // is the world height or width relevant for scaling
-  protected var xOffset = 0d
+  protected var _heightSet: Boolean = _
   // screen offset to center the drawing
+  protected var xOffset = 0d
   protected var yOffset = 0d
   // world border
   protected var wbx1: Double = 0
@@ -81,26 +78,14 @@ class ScaleModel extends Scaler {
   protected var _relativeScale: (Double, Double) = (1d, 100d)
   protected var _thicknessScale = 1d
   var colorsFixed = true // Color==Pen coupling
-
   def isPrintScaler = false
-
   def thicknessScale: Double = _thicknessScale
-
   def world_Width: Double = _world_Width
-
   def world_Height: Double = _world_Height
 
   private val scaleListeners = collection.mutable.HashSet[() => Unit]()
 
-  //val strokeMap=collection.mutable.HashMap[(Int),BasicStroke]()
-
   def relScaleFactor: Double = _relativeScale._2 / _relativeScale._1
-
-  /*def getStroke(thick:Float,style:Int)={
-    //if(thick<0) System.err.println("Stroke thick :"+thick)
-    val key=thick.hashCode+style.toShort*Short.MaxValue
-    strokeMap.getOrElseUpdate(key,LineStyleHandler.createStroke(thicknessToScreen,thick,style))
-  }*/
 
   def viewSize: (Int, Int) = (_viewSizeX, _viewSizeY)
 
@@ -114,12 +99,9 @@ class ScaleModel extends Scaler {
       calcOffsets()
       notifyScaleChanged()
     }
-
   }
 
-
   def setWorldBounds(x: Double, y: Double, w: Double, h: Double): Unit = {
-    //System.out.println("Set world bounds :x="+x+" y="+y+" w="+w+" h="+h+" "+Thread.currentThread().getStackTrace()(2))
     _world_X = x
     _world_Y = y
     _world_Width = if (w == 0) 0.1 else w
@@ -303,7 +285,6 @@ class ScaleModel extends Scaler {
   def worldScale: Double = scale * dotPitch
 
   def getScaleRatio: (Double, Double) = {
-    //if(scale<0) System.err.println("Scale <0:"+scale)
     val ret = scale * dotPitch / 1000d
     if (ret > 1) (ret, 1) else (1, 1 / ret)
   }
@@ -375,7 +356,7 @@ class ScaleModel extends Scaler {
     val height = wby2 - wby1
     (wbx1 + width / 2d,
       wby1 + height / 2d,
-      height / 2 * 1.05)
+      Math.max(width,height) / 2 * 1.05)
   }
 
 }

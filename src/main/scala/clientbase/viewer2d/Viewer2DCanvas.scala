@@ -1,13 +1,14 @@
 package clientbase.viewer2d
 
-import clientbase.control.{CreateActionList, FocusOwner, SelectionController}
+import clientbase.control.{FocusOwner, SelectionController}
 import definition.data.{EMPTY_REFERENCE, Reference}
 import org.denigma.threejs._
 import org.scalajs.dom
 import org.scalajs.dom._
-import org.scalajs.dom.html.Div
+import org.scalajs.dom.html.{Canvas, Div}
 import org.scalajs.dom.raw.{ClientRect, HTMLElement}
 import util.{Log, StrToInt}
+import scalatags.JsDom.all._
 
 import scala.collection.mutable
 import scala.scalajs.js
@@ -27,8 +28,7 @@ object MouseButtons extends Enumeration {
     if ((i & 1) > 0) LEFT else if ((i & 2) > 0) RIGHT else if ((i & 4) > 0) MIDDLE else NONE
 }
 
-class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLElement, vertCross: HTMLElement, selectRectangle:HTMLElement,
-                     scaleModel: ScaleModel) extends FocusOwner {
+class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel: ScaleModel) extends FocusOwner {
   final val tresh = 2
   val IntersectPattern: Regex = "([CDEFLST])(\\d+)".r
   var isPainting=false
@@ -54,6 +54,13 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   val pickVector = new Vector2()
   val selectDragTreshold=3
   var isRectDragging:Boolean=false
+  val hudCanvas: Canvas =canvas(`class`:="hud-canvas").render
+  val pointerCorrX: Double = 0.5d
+  val pointerCorrY: Double = -0.5d
+  renderer.domElement.style.position="absolute"
+  renderer.domElement.style.overflow = "hidden"
+  canvHolder.appendChild(hudCanvas)
+  canvHolder.appendChild(renderer.domElement)
 
   val wheelListener:scala.scalajs.js.Function1[WheelEvent, Unit]=(e: WheelEvent) => {
     //println("wheel "+e.deltaMode+" y:"+e.deltaY)
@@ -65,7 +72,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   val mouseDownListener:scala.scalajs.js.Function1[MouseEvent, Unit]= (e:MouseEvent)=>{
     println("click "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" "+e.ctrlKey)
     notifyFocus()
-    canv.focus()
+    canvHolder.focus()
     downButtons=e.buttons
     isRectDragging=false
     downX=e.clientX
@@ -76,65 +83,78 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     e.stopPropagation()
   }
 
-  val moveListener:scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent)=>{
-    //val rect=canv./*parentElement.*/getBoundingClientRect()
-    //controller.movetime=System.currentTimeMillis()
-    horCross.style.top = (e.clientY - 10).toString + "px"
-    vertCross.style.left = (e.clientX - currentBounds.left + 4).toString + "px"
+  val mouseUpListener:scala.scalajs.js.Function1[MouseEvent, Unit]= (e:MouseEvent)=>{
+    //println("up "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" ctrl:"+e.ctrlKey+" isRectDragging:"+isRectDragging+" cbt:"+currentBounds.top)
+    e.preventDefault()
+    if(isRectDragging) {
+      isRectDragging=false
+      currentBounds = canvHolder.getBoundingClientRect()
+      controller.rectDragCompleted((downX-currentBounds.left-9.5).toInt,(downY-currentBounds.top).toInt,(e.clientX-currentBounds.left).toInt,(e.clientY-currentBounds.top).toInt,e.ctrlKey,e.shiftKey)
+      drawCrossHair(e.clientX,e.clientY)
+    } else
+      controller.mouseClicked(MouseButtons.getButton(downButtons), downX, downY, e.ctrlKey)
+    downButtons=0
+  }
+
+
+  val moveListener:scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent)=>{   
+    //drawCrossHair(lastMouseX,lastMouseY)
     if (downButtons == MouseButtons.MIDDLE.id) {
       val dx=lastMouseX-e.clientX
       val dy=lastMouseY-e.clientY
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      /*if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {*/
         if (e.ctrlKey) {
-          camera.rotation.y = camera.rotation.y + Math.PI * dx / canv.clientWidth
-          camera.rotation.x = camera.rotation.x + Math.PI * dy / canv.clientHeight
+          camera.rotation.y = camera.rotation.y + Math.PI * dx / canvHolder.clientWidth
+          camera.rotation.x = camera.rotation.x + Math.PI * dy / canvHolder.clientHeight
           repaint()
         } else {
           controller.scaleModel.move(dx, dy)
         }
-        lastMouseX = e.clientX
-        lastMouseY = e.clientY
-      }
+      //}
       e.stopPropagation()
       e.preventDefault()
     } else if(downButtons== MouseButtons.LEFT.id) {
       if(controller.controllerState==ControllerState.SelectElems) {
         if(!isRectDragging && !inDistance(e.clientX,e.clientY,downX,downY,selectDragTreshold)) {
           isRectDragging=true
-          selectRectangleVisible(true)
+          //selectRectangleVisible(true)
           //println("Start Drag Rect downx:"+downX+" downy:"+downY)
-        }
-        if(isRectDragging) {
-          selectRectangle.style.left=(scala.math.min(e.clientX,downX)-currentBounds.left+4).toString+"px"
-          selectRectangle.style.width=scala.math.abs(e.clientX-downX).toString+"px"
-          selectRectangle.style.top=(scala.math.min(e.clientY,downY)-10).toString+"px"
-          selectRectangle.style.height= scala.math.abs(e.clientY-downY).toString+"px"
         }
       }
     }
-
+    lastMouseX = e.clientX
+    lastMouseY = e.clientY
+    drawCrossHair(e.clientX,e.clientY)
   }
-
-  val mouseUpListener:scala.scalajs.js.Function1[MouseEvent, Unit]= (e:MouseEvent)=>{
-    //println("up "+e.clientX+" "+e.clientY+" b:"+e.button+" bs:"+e.buttons+" ctrl:"+e.ctrlKey+" isRectDragging:"+isRectDragging+" cbt:"+currentBounds.top)
-    //e.stopPropagation()
-    e.preventDefault()
+  
+  def drawCrossHair(mX:Double,mY:Double):Unit = {
+    val context  =hudCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    context.globalCompositeOperation = "xor"
+    currentBounds = canvHolder.getBoundingClientRect()
+    context.clearRect(0,0,hudCanvas.width,hudCanvas.height)
+    context.fillStyle="rgb(0,0,0)"
+    context.lineWidth=1
+    context.beginPath()
+    //println("move x:"+mX+" y:"+mY+" target:"+e.currentTarget)
+    context.moveTo(0,mY-currentBounds.top-pointerCorrY)
+    context.lineTo(hudCanvas.width,mY-currentBounds.top-pointerCorrY)
+    context.moveTo(mX-currentBounds.left-pointerCorrX,0.5)
+    context.lineTo(mX-currentBounds.left-pointerCorrX,hudCanvas.height-0.5)
+    context.stroke()
     if(isRectDragging) {
-      isRectDragging=false
-      selectRectangleVisible(false)
-      currentBounds = canv.getBoundingClientRect()
-      controller.rectDragCompleted((downX-currentBounds.left).toInt,(downY-currentBounds.top).toInt,(e.clientX-currentBounds.left).toInt,(e.clientY-currentBounds.top).toInt,e.ctrlKey,e.shiftKey)
-    } else
-      controller.mouseClicked(MouseButtons.getButton(downButtons), downX, downY, e.ctrlKey)
-    downButtons=0
+      context.strokeRect(scala.math.min(mX,downX)-currentBounds.left-pointerCorrX,scala.math.min(mY,downY)-currentBounds.top-pointerCorrY,scala.math.abs(mX-downX),scala.math.abs(mY-downY))
+    }
   }
 
-  canv.appendChild(renderer.domElement)
+  def cleanUpCrosshairCanvas(e:MouseEvent):Unit ={
+    val context  =hudCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    context.clearRect(0,0,hudCanvas.width,hudCanvas.height)
+  }
 
   def notifyFocus():Unit = {
     SelectionController.setFocusedElement(this)
-    CreateActionList.containerFocused(controller,0)
-    canv.style.border="solid blue 1px"
+    if (SelectionController.containerFocused(controller,0)) controller.toolbar.showCreateButtons()
+    canvHolder.style.border="solid blue 1px"
   }
 
 
@@ -142,26 +162,19 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   camera.position.z = 30
   dom.window.addEventListener("resize", (_: Event) => onResize())
   scaleModel.registerScaleListener(() => adjustCamera())
-  canv.addEventListener("contextmenu", contextListener, useCapture = false)
-  horCross.addEventListener("contextmenu", contextListener, useCapture = false)
-  vertCross.addEventListener("contextmenu", contextListener, useCapture = false)
-  canv.addEventListener("mouseenter", (_: MouseEvent) => {
-    if (!SelectionController.supportsTouch) {
-      horCross.style.visibility = "visible"
-      vertCross.style.visibility = "visible"
-    }
+  canvHolder.addEventListener("contextmenu", contextListener, useCapture = false)
+  canvHolder.addEventListener("mouseenter", (e: MouseEvent) => {
   })
-  canv.addEventListener("mouseleave", (e: MouseEvent) => {
-    horCross.style.visibility = "hidden"
-    vertCross.style.visibility = "hidden"
-    if (e.target == canv && downButtons > 0) mouseUpListener.apply(e)
+  canvHolder.addEventListener("mouseleave", (e: MouseEvent) => {
+    if (e.target == canvHolder && downButtons > 0) mouseUpListener.apply(e)
+    cleanUpCrosshairCanvas(e)
   })
-  canv.addEventListener("wheel", wheelListener, useCapture = true)
-  canv.addEventListener("mousedown", mouseDownListener, useCapture = true)
-  canv.addEventListener("mouseup", mouseUpListener, useCapture = true)
-  canv.addEventListener("mousemove", moveListener, useCapture = true)
+  canvHolder.addEventListener("wheel", wheelListener, useCapture = true)
+  canvHolder.addEventListener("mousedown", mouseDownListener, useCapture = true)
+  canvHolder.addEventListener("mouseup", mouseUpListener, useCapture = true)
+  canvHolder.addEventListener("mousemove", moveListener, useCapture = true)
 
-  canv.addEventListener("touchstart", (e: TouchEvent) => {
+  canvHolder.addEventListener("touchstart", (e: TouchEvent) => {
     SelectionController.printMessage("touchstart " + e.targetTouches.length + " " + e.targetTouches.item(0).identifier)
     e.targetTouches.length match {
       case 1 =>
@@ -187,8 +200,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     e.preventDefault()
   })
 
-  canv.addEventListener("touchmove", (e: TouchEvent) => {
-
+  canvHolder.addEventListener("touchmove", (e: TouchEvent) => {
     e.targetTouches.length match {
       case 1 =>
         val t1 = e.targetTouches.item(0)
@@ -206,7 +218,6 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
             } else controller.mouseClicked(MouseButtons.LEFT, t1.clientX, t1.clientY, controlKey = false)
           case None => SelectionController.printMessage("touchmove touch with identifier not found " + t1.identifier + " oldTouches:" + oldTouches.mkString("|"))
         }
-
 
       case 2 =>
         val t1 = e.targetTouches.item(0)
@@ -243,7 +254,6 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
           }
           else {
             // zoom
-
             val commonX = Math.abs(d1x) + Math.abs(d2x)
             val commonY = Math.abs(d1y) + Math.abs(d2y)
             //SelectionController.printMessage("d1x:" + dir1x + " d1y:" + dir1y + " d2x:" + dir2x + " d2y:" + dir2y+" cx:"+commonX+" dy:"+commonY)
@@ -251,24 +261,24 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
               if (((nX1 < nX2) && dir1x == 1) || ((nX2 < nX1) && dir2x == 1) ||
                 ((nX1 < nX2) && dir2x == -1) || ((nX2 < nX1) && dir1x == -1)) {
                 // zoomout
-                controller.scaleModel.zoomOutBy(commonX / canv.clientWidth)
+                controller.scaleModel.zoomOutBy(commonX / canvHolder.clientWidth)
                 updateTouch()
               }
               else if (((nX1 < nX2) && dir1x == -1) || ((nX2 < nX1) && dir2x == -1) ||
                 ((nX1 < nX2) && dir2x == 1) || ((nX2 < nX1) && dir1x == 1)) {
-                controller.scaleModel.zoomInBy(commonX / canv.clientWidth)
+                controller.scaleModel.zoomInBy(commonX / canvHolder.clientWidth)
                 updateTouch()
               }
             } else if (commonY > tresh + 2) {
               if (((nY1 < nY2) && dir1y == 1) || ((nY2 < nY1) && dir2y == 1) ||
                 ((nY1 < nY2) && dir2y == -1) || ((nY2 < nY1) && dir1y == -1)) {
                 // zoomout
-                controller.scaleModel.zoomOutBy(commonY / canv.clientHeight)
+                controller.scaleModel.zoomOutBy(commonY / canvHolder.clientHeight)
                 updateTouch()
               }
               else if (((nY1 < nY2) && dir1y == -1) || ((nY2 < nY1) && dir2y == -1) ||
                 ((nY1 < nY2) && dir2y == 1) || ((nY2 < nY1) && dir1y == 1)) {
-                controller.scaleModel.zoomInBy(commonY / canv.clientHeight)
+                controller.scaleModel.zoomInBy(commonY / canvHolder.clientHeight)
                 updateTouch()
               }
             }
@@ -281,17 +291,13 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
   })
 
   val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (_: TouchEvent) => {
-    //oldTouches.clear()
   }
 
-  canv.addEventListener("touchend", touchEndListener)
-  canv.addEventListener("touchcangel", touchEndListener)
-  selectRectangleVisible(false)
+  canvHolder.addEventListener("touchend", touchEndListener)
+  canvHolder.addEventListener("touchcangel", touchEndListener)
+
 
   def getDir(d: Double): Int = if (Math.abs(d) <= tresh) 0 else if (d < 0d) -1 else 1
-
-
-  def selectRectangleVisible(visible:Boolean):Unit = selectRectangle.style.visibility=if(visible) "visible" else "hidden"
 
   def addGeometry(obj: Object3D): Unit = {
     if (obj != null)
@@ -303,15 +309,20 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
       scene.remove(obj)
   }
 
-  def onResize():Unit= if(canv.clientWidth>0){
-    currentBounds = canv.getBoundingClientRect()
-    val w = canv.clientWidth - 1
-    val h = canv.clientHeight - 1
+  def onResize():Unit= if(canvHolder.clientWidth>0){
+    currentBounds = canvHolder.getBoundingClientRect()
+    val w = canvHolder.clientWidth - 1
+    val h = canvHolder.clientHeight - 1
+    //println("resize "+w+" "+h)
+    hudCanvas.width=w
+    hudCanvas.height=h
+
     controller.scaleModel.setViewSize(w,h)
     renderer.setSize(w * 1.5d, h * 1.5d, updateStyle = false)
     renderer.domElement.style.width = w + "px"
     renderer.domElement.style.height = h + "px"
-    renderer.domElement.style.overflow = "hidden"
+    hudCanvas.style.width=renderer.domElement.style.width
+    hudCanvas.style.height=renderer.domElement.style.height
     val oldx = camera.position.x
     val oldy = camera.position.y
     val oldz = camera.position.z
@@ -324,15 +335,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
     camera.rotation.x = oldrx
     camera.rotation.y = oldry
     camera.updateProjectionMatrix()
-    //adjustCamera()
-    if (!SelectionController.supportsTouch) {
-      horCross.style.width = "calc( 100% - 31px)"
-      horCross.style.height = "1px"
-      horCross.style.left = "1px"
-      vertCross.style.width = "1px"
-      vertCross.style.top = (currentBounds.top + 10).toString + "px"
-      vertCross.style.height = "calc(100% - 120px)"
-    }
+
     repaint()
   }
 
@@ -407,8 +410,8 @@ class Viewer2DCanvas(controller: Viewer2DController, canv: Div, horCross: HTMLEl
 
 
   def blur():Unit ={
-    canv.blur()
-    canv.style.removeProperty("border")
+    canvHolder.blur()
+    canvHolder.style.removeProperty("border")
     repaint()
   }
 

@@ -1,6 +1,6 @@
 package clientbase.viewer2d
 
-import clientbase.control.{FieldEditor, FieldEditorPanel, SidePanelComboBox, SidePanelComponent}
+import clientbase.control.{FieldEditor, SidePanelComboBox, SidePanelComponent, SidepanelController}
 import definition.expression.{Constant, IntConstant}
 import org.scalajs.dom.html.Div
 import scalatags.JsDom.all._
@@ -40,8 +40,8 @@ class LineFormatEditor extends FieldEditor{
 
   override def  getPanel: Div= panel
 
-  lazy val panel: Div = div(style:="float:left")(FieldEditorPanel.panelPart("Dicke",widthCombo.elem),
-    FieldEditorPanel.panelPart("Stil",styleCombo.elem)).render
+  lazy val panel: Div = div(style:="float:left")(SidepanelController.panelPart("Dicke",widthCombo.elem),
+    SidepanelController.panelPart("Stil",styleCombo.elem)).render
 }
 
 object LineStyleEditor{

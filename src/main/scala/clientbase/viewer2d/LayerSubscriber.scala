@@ -49,6 +49,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     scaleID=inst.fieldValue(2).toInt
   })
 
+
   lazy val ownerReference = new OwnerReference(0.toByte, layerRef)
 
   override def load(parentRef: Reference, propField: Int, doneListener: () => Unit): Unit = {
@@ -215,13 +216,13 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
     GraphElem.calcBounds(map.valuesIterator,controller)
   }
 
-  def toggleVisibility(): Unit = controller.layerList.toggleVisibility(this)
+  protected def toggleVisibility(): Unit = controller.layerList.toggleVisibility(this)
 
-  def toggleEditable(): Unit = controller.layerList.toggleEditable(this)
+  protected def toggleEditable(): Unit = controller.layerList.toggleEditable(this)
 
-  def setActive():Unit = controller.layerList.setActiveLayer(this)
+  protected def setActive():Unit = controller.layerList.setActiveLayer(this)
 
-  def forceActive():Unit = controller.layerList.forceActiveLayer(this)
+  protected def forceActive():Unit = controller.layerList.forceActiveLayer(this)
 
 
   def show(): Unit = if (!visible && subsID == -1) {

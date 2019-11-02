@@ -50,7 +50,7 @@ class PointAnswerPanel extends AnswerPanel {
 
   override def loadAnswerParam(nanswerDefinition: AnswerDefinition): Node = {
     super.loadAnswerParam(nanswerDefinition)
-    for (lc<-CreateActionList.lastContainer) lc match {
+    for (lc<-SelectionController.lastContainer) lc match {
       case vc:AbstractViewerController=>
         viewController=Some(vc)
         vc.askForPoint()

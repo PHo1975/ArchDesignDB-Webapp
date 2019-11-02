@@ -70,8 +70,6 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
           container.addGeometry(mesh)
         }
 
-
-
         def drawText(meshes: js.Array[Mesh],withHText:Boolean,fontHeight:Double,posx:Double,posy:Double,angle:Double): Unit = {
           val lastMesh=meshes.size-1
           for(mi<-meshes.indices;m=meshes(mi)){
@@ -88,20 +86,15 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
             _geometry.push(m)
           }
         }
-
         val rscale=container.scaleRatio
         val hoff=(lastInterPoint-firstInterPoint).unit*(rscale*styleInfo.helpLineOffset/1000)
         if(!styleInfo.hideDimensionLine)drawLine(firstInterPoint-hoff,lastInterPoint+hoff)
-        //println("Symbol elems:"+styleInfo.symbolElems)
-
         for((mp,ip)<-intersectionLines;p1=mp.refPoint){
           val dirUnit=(ip-p1).unit
           val decorOff=dirUnit*(rscale*styleInfo.helpLineOffset/1000d)
-
           if(mp.helpLineLength==0|| styleInfo.hideHelpLine) drawLine(ip-decorOff,ip+decorOff)
           else if(styleInfo.hasFixedHelpLine) drawLine(ip+decorOff,ip-dirUnit*(styleInfo.fixedHelpLineLength/1000d))
           else drawLine(p1+dirUnit* mp.helpLineLength,ip+decorOff)
-
           // draw decore
           if(styleInfo.isStationDimLine) {
 
@@ -115,10 +108,8 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
             container.addGeometry(mesh)
             _geometry.push(mesh)
           }
-
         }
         val textDistance=hdirVector*(styleInfo.textPosition*rscale/1000d)
-
         if(styleInfo.isStationDimLine){
           val mUnit=mdirVector.unit
           for((_,il)<-intersectionLines){
@@ -126,14 +117,7 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
             val measure=deltaM.toDouble*deltaM.unit.getScaleTo(mUnit) +relDist
             val text: Seq[String] =styleInfo.formatMeasure(measure)
             val fontHeight=styleInfo.textHeight/1000d*container.scaleRatio
-            //val textWidth=text.length*fontHeight
-            //val moveitX = 0.5f
             val moveitY = 0.3f
-            //val withHtext= text.size>1&&text(1)!="0"
-
-            //val xpos= il.x-textDistance.y
-            //val ypos=(il.y-textDistance.x)-moveitY*fontHeight
-            //drawText(text,fontHeight,xpos+moveitX*fontHeight,ypos,-radAngle+Math.PI/2)
           }
         }
         else for(Seq(ixa,ixb)<-intersectionLines.indices.sliding(2);a=intersectionLines(ixa);b=intersectionLines(ixb)) {
@@ -158,7 +142,6 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
             else if ((intersectionLines(ixb+1)._2 - b._2).toDouble/3.9f >worldTextWidth) moveitX= -2.1f
             else moveitY=if(ixa % 2 ==1) 0.8f else -1.5f
           }
-          //println("textWidth:"+textWidth+" measure:"+measure+" ixa:"+ixa+" ixb:"+ixb+" moveitX:"+moveitX+" moveitY:"+moveitY)
           val posVect=midPoint+textDistance-mdirVector*(textWidth/2f*moveitX)+hdirVector*(moveitY*fontHeight)
           val meshes =geometries.map(g=>{
             val nm=new Mesh(g,GraphElem.getMaterial(color))
@@ -167,13 +150,12 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
           })
           drawText(meshes,withHtext,styleInfo.textHeight,posVect.x,posVect.y,radAngle)
         }
-
       })
   }
 
   override def geometry: js.Array[Object3D] = _geometry
 
-//  override def hideSelection(): Unit = {}
-
   override def getFormatFieldValue(fieldNr: Int): Constant = EMPTY_EX
+
+  override def getHitPoints(container: ElemContainer): Seq[VectorConstant] = hitPoints
 }

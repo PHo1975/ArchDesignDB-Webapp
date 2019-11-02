@@ -1,6 +1,6 @@
 package clientbase.viewer2d
 
-import clientbase.control.{FieldEditor, FieldEditorPanel, SidePanelComponent}
+import clientbase.control.{FieldEditor, SidePanelComponent, SidepanelController}
 import definition.expression.{Constant, IntConstant}
 import org.scalajs.dom.html.{Div, Input}
 import org.scalajs.dom.raw.Event
@@ -19,7 +19,7 @@ class ColorFieldEditor extends FieldEditor {
 
   val allowedClassNames: Iterable[String] = inputField.allowedFields.keys
   val fieldComponents: Seq[SidePanelColorInputField] =Seq(inputField)
-  val panel: Div =FieldEditorPanel.panelPart("Farbe",inputField.elem)
+  val panel: Div =SidepanelController.panelPart("Farbe",inputField.elem)
   def getPanel: Div =panel
 
 }

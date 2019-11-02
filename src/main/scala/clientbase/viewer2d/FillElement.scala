@@ -8,7 +8,7 @@ import scala.scalajs.js
 
 class FillElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,val fillColor:Int,val hatchStyle:Int,val paperScale:Boolean,
                   val poly:Polygon,val  startPoint:VectorConstant,val hatchAngle:Double, var name:String="")
-  extends LinearElement(nref,ncolor,nlineWidth,nlineStyle) with Named {
+  extends LinearElement(nref,ncolor,nlineWidth,nlineStyle) with Named with Iterable[VectorConstant]{
 
   lazy val bounds= BRect(poly.minX, poly.minY, poly.maxX, poly.maxY)
 
@@ -38,7 +38,6 @@ class FillElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,val fi
         shape.lineTo(firstPoint.x,firstPoint.y)
       }
       shape.holes=holesArray
-
       val geometry=new ShapeBufferGeometry(js.Array(shape),12)
       geometry.computeFaceNormals()
       geometry.computeBoundingSphere()
@@ -47,9 +46,12 @@ class FillElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,val fi
       mesh.position.z= -.001f
       _geometry.push(mesh)
       container.addGeometry(mesh)
-
   } catch {
-    case e: Throwable => util.Log.e("Fill Geo:", e)
+      case e: Throwable => util.Log.e("Fill Geo:", e)
+    }
   }
-  }
+
+  def iterator: Iterator[VectorConstant] =poly.iterateAllPoints
+
+  override def getHitPoints(container: ElemContainer): Iterable[VectorConstant] = this
 }

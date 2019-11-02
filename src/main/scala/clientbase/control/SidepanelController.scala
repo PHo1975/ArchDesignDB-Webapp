@@ -1,10 +1,15 @@
 package clientbase.control
 
 import clientbase.connection.WebSocketConnector
-import definition.typ.ActionTrait
-import org.scalajs.dom.html._
+import clientbase.viewer2d.{ColorFieldEditor, LineFormatEditor}
+import definition.data.Referencable
+import definition.typ.{AbstractObjectClass, ActionTrait, SelectGroup}
+import org.scalajs.dom.html.{Button, Input, Label, Paragraph, Span}
+//import org.scalajs.dom.html._
 import org.scalajs.dom.raw.{HTMLElement, MouseEvent}
 import scalatags.JsDom.all._
+import org.scalajs.dom.html.Div
+
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -35,6 +40,12 @@ object SidepanelController {
   var currentActions:mutable.LinkedHashMap[String,ActionTrait]=mutable.LinkedHashMap.empty
   val messageLabel: Paragraph =p(`class`:="label")("-").render
   var multiSelectMode=false
+
+  val panelCompTag="panel-comp"
+  val fieldEditorsDiv:Div=div(`class`:="fieldeditor-panel").render
+  val fieldEditorMap: Predef.Map[String, FieldEditor] = Map("client.graphicsView.ColorFieldEditor"->new ColorFieldEditor,
+    "client.graphicsView.LineStyleEditor"-> new LineFormatEditor)
+
 
   def setup(nsidePanelRoot: HTMLElement, ncontentRoot: HTMLElement): Unit = {
     sidePanelRoot=nsidePanelRoot
@@ -75,13 +86,13 @@ object SidepanelController {
       doClose()
       if (sidePanelRoot.contains(selectionArea)) sidePanelRoot.removeChild(selectionArea)
       if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
-      if (sidePanelRoot.contains(FieldEditorPanel.mainDiv))sidePanelRoot.removeChild(FieldEditorPanel.mainDiv)
+      if (sidePanelRoot.contains(fieldEditorsDiv))sidePanelRoot.removeChild(fieldEditorsDiv)
       if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
     }
     else {
       doOpen()
       sidePanelRoot.appendChild(selectionArea)
-      sidePanelRoot.appendChild(FieldEditorPanel.mainDiv)
+      sidePanelRoot.appendChild(fieldEditorsDiv)
       showActionArea()
     }
     open= !open
@@ -99,7 +110,7 @@ object SidepanelController {
       actionArea.removeChild(actionArea.lastChild)
 
     for(action<-actions.values.toIndexedSeq.sortBy(_.buttonID)) {
-      val b=button(`class`:="actionbutton")(action.name)(onclick:={()=>{println("action "+action.name);DialogManager.loadAction(action)}}).render
+      val b=button(`class`:="actionbutton")(action.name)(onclick:={()=>{println("action "+action.name);DialogManager.startAction(action)}}).render
       actionArea.appendChild(b)
     }
     actionArea.appendChild(messageLabel)
@@ -112,11 +123,37 @@ object SidepanelController {
   def showAnswerPanel(): Unit = {
     println("showAnswerPanel")
     doOpen()
-    FieldEditorPanel.hideFieldEditors()
+    hideFieldEditors()
     if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
     sidePanelRoot.appendChild(DialogManager.answerController.panel)
   }
 
   def showActionArea():Unit=sidePanelRoot.appendChild(actionArea)
+
+    def panelPart(lname:String,partComp:HTMLElement):Div={
+    val elem=div(`class`:="panelpart")(div(`class`:="panel-label")(lname),partComp).render
+    partComp.classList.add(panelCompTag)
+    elem
+  }
+
+  def loadFieldEditors(theClass:AbstractObjectClass, groupList:Seq[SelectGroup[_ <: Referencable]]): Unit = {
+    //println("Show Field Editors "+theClass.name)
+    clearFieldEditors()
+    for (ed<-theClass.fieldEditors;if fieldEditorMap.contains(ed)) {
+      val editor=fieldEditorMap(ed)
+      fieldEditorsDiv.appendChild(editor.getPanel)
+      editor.setData(groupList)
+      //println("add "+ed)
+    }
+  }
+
+  def clearFieldEditors():Unit = {
+    while(fieldEditorsDiv.childElementCount>0)
+      fieldEditorsDiv.removeChild(fieldEditorsDiv.firstChild)
+  }
+
+  def hideFieldEditors():Unit=fieldEditorsDiv.style.visibility="hidden"
+
+  def showFieldEditors():Unit=fieldEditorsDiv.style.visibility="visible"
 
 }

@@ -46,6 +46,7 @@ class LayerList(controller:Viewer2DController) {
     lay.show()
     lay.setEditable(true)
     lay.setActive(true)
+    controller.canvasHandler.notifyFocus()
   }
 
   def forceActiveLayer(lay:LayerSubscriber):Unit= {
@@ -135,5 +136,7 @@ class LayerList(controller:Viewer2DController) {
     } )
     ret1
   }
+
+
 
 }

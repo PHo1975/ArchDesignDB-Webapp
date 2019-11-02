@@ -36,6 +36,7 @@ class BoundsContainer(var minX:Double=0d,var minY:Double=0d,var maxX:Double=0d,v
 
 trait Formatable extends Referencable {
   def getFormatFieldValue(fieldNr: Int): Constant
+  def getHitPoints(container:ElemContainer):Iterable[VectorConstant]
 }
 
 trait ElemContainer {
@@ -75,6 +76,7 @@ abstract class GraphElem(override val ref: Reference, val color: Int) extends Fo
 class GraphElemStub(override val ref:Reference) extends GraphElem(ref,0)  {
   def getFormatFieldValue(fieldNr:Int):Constant=EMPTY_EX
   def getBounds(container: ElemContainer): Bounds =GraphElem.NULLRECT
+  def getHitPoints(container:ElemContainer):Seq[VectorConstant]=Seq.empty
 
   def createGeometry(container:ElemContainer): Unit = {}
   //def hideSelection(): Unit = {}
@@ -99,6 +101,8 @@ abstract class LinearElement(nref:Reference,ncolor:Int,val lineWidth:Int,val lin
 
 abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,val startPoint:VectorConstant,val endPoint:VectorConstant) extends
   LinearElement(nref,ncolor,nlineWidth,nlineStyle) with Bounds {
+  val hitPoints=List(startPoint,endPoint)
+
   def minX: Double = scala.math.min(startPoint.x, endPoint.x)
   def minY: Double = scala.math.min(startPoint.y, endPoint.y)
   def maxX: Double = scala.math.max(startPoint.x, endPoint.x)
@@ -106,6 +110,8 @@ abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlin
 
   override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
     GraphElem.calcScreenBoundsfrom2Points(startPoint,endPoint,camera,res)
+
+  def getHitPoints(container:ElemContainer)=hitPoints
 
   override def getBounds(container: ElemContainer): Bounds = this
 }
@@ -130,6 +136,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
   LinearElement(nref,ncolor,nlineWidth,nlineStyle) {
   //println("create arc "+ref+" "+centerPoint)
   lazy val points:Seq[VectorConstant]=List(pointFromAngle(startAngle),pointFromAngle(endAngle),centerPoint)
+  def getHitPoints(container:ElemContainer): Seq[VectorConstant] =points
   protected lazy val bounds: BRect = calcArcBounds
   protected val cornerPoints: ArrayBuffer[VectorConstant] =ArrayBuffer[VectorConstant]()
 
@@ -188,6 +195,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
 
 
 
+
 case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineStyle: Int, centerPoint: VectorConstant,
                           r1: Double, r2: Double, mainAngle: Double, startAngle: Double, endAngle: Double) extends LinearElement(nref, ncolor, nlineWidth, nlineStyle) {
 
@@ -195,6 +203,7 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
     math.atan(math.tan(outerAngle) * (r1 + delta) / (r2 + delta))
 
   lazy val points: Seq[VectorConstant] = List(pointFromAngle(startAngle * math.Pi / 180d), pointFromAngle(endAngle * math.Pi / 180d), centerPoint)
+  def getHitPoints(container:ElemContainer): Seq[VectorConstant] =points
   protected lazy val bounds: Bounds = calcBounds
   protected val cornerPoints: ArrayBuffer[VectorConstant] =ArrayBuffer[VectorConstant]()
 
@@ -218,7 +227,6 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
   }
 
   def calcBounds: Bounds =  GraphElem.getPointsBounds(createBoundsPoints)
-
 
   protected def createBoundsPoints: ArrayBuffer[VectorConstant] = {
     if(cornerPoints.isEmpty) {
@@ -248,7 +256,6 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
     try {
       val delta = deltaW
       val steps = Math.floor(delta / GraphElem.schrittWeiteEllipse).toInt
-
       val apoints = new Float32Array((steps + 2) * 3 * 2)
       val thick = (if(lineWidth==0)1 else lineWidth.toDouble)*container.scaleRatio / 100000d
 
@@ -261,12 +268,9 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
         apoints(index + 3) = p2.x.toFloat
         apoints(index + 4) = p2.y.toFloat
       }
-
-      // setPoints(0, 0)
       for (st <- 0 to steps)
         setPoints(st * 6, st.toDouble * GraphElem.schrittWeiteEllipse)
       setPoints((steps + 1) * 6, delta)
-
       val geom = new MyBufferGeometry()
       val indices = new js.Array[Int]((steps + 1) * 6)
       var current = 0
@@ -279,9 +283,6 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
       geom.computeFaceNormals()
       geom.computeBoundingSphere()
       val mesh = new Mesh(geom, GraphElem.getMaterial(color))
-      //mesh.position.x = centerPoint.x
-      //mesh.position.y = centerPoint.y
-      //mesh.rotation.z = startAngle * Math.PI / 180d
       mesh.name = "E" + ref.instance
       _geometry.push(mesh)
       container.addGeometry(mesh)
@@ -293,15 +294,30 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
 
 
 
+
 case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorConstant,fontName:String,fheight:Double,
                        widthRatio:Double,style:Int,
                        textAngle:Double,obligeAngle:Double,lineSpace:Double) extends GraphElem(nref,ncolor) {
   protected val _geometry=new js.Array[Object3D]
   val meshName: String ="T"+ref.instance
   protected var textWidth: Double = -1d
+  private var cornerPoints:Array[VectorConstant]=_
 
-  protected var cornerPoints:Array[VectorConstant]=_
-  //println("Text "+text)
+  protected def getCornerPoints(container:ElemContainer): Array[VectorConstant] =if (cornerPoints==null) {
+    cornerPoints=new Array[VectorConstant](4)
+    val height=fheight/1000d*container.scaleRatio
+    val width=if(textWidth>0) textWidth else height*text.length/2
+    val x=position.x+(if(isStyle(GraphElem.rightStyle))-textWidth
+    else if(isStyle(GraphElem.hCenterStyle)) -textWidth/2 else 0)
+    val y=position.y+ (if(isStyle(GraphElem.bottomStyle))-height
+    else if (isStyle(GraphElem.vCenterStyle)) -height/2 else 0)
+    cornerPoints(0)=new VectorConstant(x,y,0)
+    cornerPoints(1)=new VectorConstant(x,y+height,0)
+    cornerPoints(2)=new VectorConstant(x+width,y+height,0)
+    cornerPoints(3)=new VectorConstant(x+width,y,0)
+    cornerPoints
+  } else cornerPoints
+
   def isStyle(pattern: Int): Boolean = (style & pattern) > 0
 
   override def geometry:js.Array[Object3D]=_geometry
@@ -312,41 +328,20 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
     BRect(position.x-width,position.y-height/2,position.x+width,position.y+height/2)
   }
 
-
-
   override def getBounds(container: ElemContainer): Bounds = calcBounds(container)
 
-  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit = {
-    if (cornerPoints==null) {
-      cornerPoints=new Array[VectorConstant](4)
-      val height=fheight/1000d*container.scaleRatio
-      val width=if(textWidth>0) textWidth else height*text.length/2
-      val x=position.x+(if(isStyle(GraphElem.rightStyle))-textWidth
-      else if(isStyle(GraphElem.hCenterStyle)) -textWidth/2 else 0)
-      val y=position.y+ (if(isStyle(GraphElem.bottomStyle))-height
-      else if (isStyle(GraphElem.vCenterStyle)) -height/2 else 0)
-      cornerPoints(0)=new VectorConstant(x,y,0)
-      cornerPoints(1)=new VectorConstant(x,y+height,0)
-      cornerPoints(2)=new VectorConstant(x+width,y+height,0)
-      cornerPoints(3)=new VectorConstant(x+width,y,0)
-    }
-    GraphElem.calcScreenBoundsfromPointList(cornerPoints.iterator,camera,res)
-  }
-
-
+  override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
+    GraphElem.calcScreenBoundsfromPointList(getCornerPoints(container).iterator,camera,res)
 
   override def createGeometry(container:ElemContainer): Unit = try{
-
-    GraphElem.loadTextGeometry(container,text,fheight,fontName, (tg: js.Array[ShapeGeometry]) =>{
-      if(tg.length>0) {
-        tg.head.computeBoundingBox()
-        tg.last.computeBoundingBox()
-
-        textWidth = tg.last.boundingBox.max.x - tg.head.boundingBox.min.x
+    GraphElem.loadTextGeometry(container,text,fheight,fontName, (tgArray: js.Array[ShapeGeometry]) =>{
+      if(tgArray.length>0) {
+        tgArray.head.computeBoundingBox()
+        tgArray.last.computeBoundingBox()
+        textWidth = tgArray.last.boundingBox.max.x - tgArray.head.boundingBox.min.x
         val textHeight = fheight / 1000 * container.scaleRatio
-        //println("text:"+text+ " textheight:"+fheight+" width:"+textWidth+" tg:"+tg.length)
-        for (g <- tg) {
-          val mesh = new Mesh(g, GraphElem.getMaterial(color))
+        for (geom <- tgArray) {
+          val mesh = new Mesh(geom, GraphElem.getMaterial(color))
           mesh.position.set(position.x + (if (isStyle(GraphElem.rightStyle)) -textWidth
           else if (isStyle(GraphElem.hCenterStyle)) -textWidth / 2 else 0),
             position.y + (if (isStyle(GraphElem.bottomStyle)) -textHeight
@@ -358,26 +353,26 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
         }
       } else println("Emtpy Text Geometry for Text:"+text+" font:"+fontName)
     })
-
   }catch {
     case e: Throwable => util.Log.e("Font Geo:", e)
   }
-
-//  override def showSelection(): Unit = {}
-//
-//  override def hideSelection(): Unit = {}
 
   override def getFormatFieldValue(fieldNr: Int): Constant = fieldNr match {
     case 0 => IntConstant(color)
     case _ => null
   }
+
+  override def getHitPoints(container: ElemContainer): Seq[VectorConstant] = getHitPoints(container)
 }
 
 
 
-  /***************************************************************************************************************************************/
 
-  object GraphElem {
+
+
+/***************************************************************************************************************************************/
+
+object GraphElem {
   final val LAYERTYPE = 39
   final val LINETYPE = 40
   final val ARCTYPE = 41
@@ -395,6 +390,9 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
   final val bottomStyle = 2
   final val hCenterStyle = 8
   final val rightStyle = 16
+  val HITX: Byte = 1
+  val HITY: Byte = 2
+  val HITBOTH: Byte = 3
 
   var font:ThreeFont=_
   //val fontMap=mutable.HashMap[String,js.Any]()
@@ -591,6 +589,23 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
 
 
   private[viewer2d] val projectVector=new Vector3()
+
+  /** checks if the given point p checks with the click point at coordinate px,py
+   *
+   * @param px click pos x
+   * @param py click pos y
+   * @param dist maximal distance
+   * @param p element point
+   * @return  a List of one Tuple (Byte =GraphElemConst.HITBOTH,.HITX or .HITY,p)
+   */
+  def checkHit(px:Double,py:Double,dist:Double,p:VectorConstant):Seq[(Byte,VectorConstant)]={
+    val xHit=scala.math.abs(px-p.x)<dist
+    val yHit=scala.math.abs(py-p.y)<dist
+    if(xHit&&yHit) List((HITBOTH,p))
+    else if(xHit)List((HITX,p))
+    else if(yHit)List((HITY,p))
+    else Nil
+  }
 
 
 

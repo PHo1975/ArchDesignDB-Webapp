@@ -1,7 +1,7 @@
 package clientbase.tableview
 
 import clientbase.connection.{InstSubscriber, WebSocketConnector}
-import clientbase.control.{CreateActionList, FocusContainer, SelectionController}
+import clientbase.control.{FocusContainer, SelectionController}
 import definition.data._
 import definition.typ.AllClasses
 import org.scalajs.dom
@@ -133,7 +133,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
       case a @ Some(_) => lastFocusedTable = a
       case _ =>
     }
-    CreateActionList.containerFocused(this,curPropertyField)
+    SelectionController.containerFocused(this,curPropertyField)
   }
 
   override def containerName: String = ""
