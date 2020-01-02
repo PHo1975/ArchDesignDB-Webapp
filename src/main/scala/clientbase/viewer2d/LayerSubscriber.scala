@@ -1,18 +1,16 @@
 package clientbase.viewer2d
 
 import java.io.DataInput
-
 import clientbase.connection.WebSocketConnector
 import clientbase.control.SelectionController
 import clientbase.localstore.{SingleInstanceSubs, SubsMap}
 import definition.data._
-import definition.expression.Expression
+import definition.expression.{Expression, VectorConstant}
 import definition.typ.SelectGroup
 import org.scalajs.dom.html.{Button, Image, TableCell, TableRow}
 import org.scalajs.dom.raw.MouseEvent
 import scalatags.JsDom.all._
 import util.Log
-
 import scala.scalajs.js
 import scala.util.control.NonFatal
 
@@ -88,7 +86,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           in.readBoolean
           ArcElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, diameter, startA, endA)
 
-        case GraphElem.ELLIPSETYP ⇒
+        case GraphElem.ELLIPSETYP =>
           val nfields = in.readByte
           if (nfields != 9) util.Log.e("Ellipse wrong number of fields " + nfields + " " + itemRef)
           val color = Expression.read(in).getValue
@@ -273,4 +271,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
 
   def filterElements(filterFunc:GraphElem=>Boolean): Iterable[GraphElem] = map.values.filter(filterFunc)
 
+  def iterateVisiblePoints(container:ElemContainer,func:VectorConstant=>Unit):Unit =
+    for(graphEl<-map.valuesIterator;point<-graphEl.getHitPoints(container))
+      func(point)
 }

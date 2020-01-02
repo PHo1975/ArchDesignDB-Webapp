@@ -83,7 +83,7 @@ case class DimLineStyle(ref:Reference,id:Int,name:String,options:Int,textFont:St
       case UnitM_MM =>
         if (math.abs(measure) < 1) {
           if (isStationDimLine && measure != 0d) f"${roundedMeasure(measure * 1000) / 10}%+3.1f"
-          else f"${roundedMeasure(measure * 1000) / 10}%3.1f"
+          else                                   f"${roundedMeasure(measure * 1000) / 10}%3.1f"
         }
         else numberFormat.format(roundedMeasure(measure * 1000) / 1000)
       case _ => "Fehler"

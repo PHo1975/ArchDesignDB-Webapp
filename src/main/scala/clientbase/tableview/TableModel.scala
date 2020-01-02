@@ -29,7 +29,7 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
   var dragIx:Int= -1
   protected val data=new ArrayBuffer[InstanceData]()
   protected val myClass: AbstractObjectClass = AllClasses.get.getClassByID(typ)
-  protected var tableSettings: Seq[ColumnInfo] =TableSettings.getColumnData(typ)
+  protected var tableSettings: Seq[ColumnInfo] =TableSettings.getColumnData(typ).toSeq
   protected val numCols: Int = if (tableSettings.isEmpty) myClass.fields.size else tableSettings.count(s => myClass.fieldSetting(s.ix).visible)
   protected val myTable: Table = table(createHeader).render
 
@@ -63,8 +63,8 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
 
   def createHeader:HTMLTableRowElement=
     tr(th(`class`:="firstcol"),
-      for((colData,ix) <-tableSettings.zipWithIndex)
-        yield createHeaderCell(myClass.fields(colData.ix).name,ix)).render
+      (for((colData,ix) <-tableSettings.zipWithIndex)
+        yield createHeaderCell(myClass.fields(colData.ix).name,ix)).toSeq).render
 
   def handleDragStart(event:DragEvent):Unit= {
     event.target match {
@@ -99,7 +99,7 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
       cell.classList.remove("over")
       if(dragIx > -1) {
         TableSettings.moveColumn(typ,dragIx,ix)
-        tableSettings=TableSettings.getColumnData(typ)
+        tableSettings=TableSettings.getColumnData(typ).toSeq
         myTable.innerHTML=""
         myTable.appendChild(createHeader)
         var row=0

@@ -2,13 +2,14 @@ package clientbase.viewer2d
 
 import clientbase.control.{FocusOwner, SelectionController}
 import definition.data.{EMPTY_REFERENCE, Reference}
+import definition.expression.VectorConstant
 import org.denigma.threejs._
 import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div}
-import org.scalajs.dom.raw.{ClientRect, HTMLElement}
-import util.{Log, StrToInt}
+import org.scalajs.dom.raw.ClientRect
 import scalatags.JsDom.all._
+import util.{Log, StrToInt}
 
 import scala.collection.mutable
 import scala.scalajs.js
@@ -30,6 +31,7 @@ object MouseButtons extends Enumeration {
 
 class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel: ScaleModel) extends FocusOwner {
   final val tresh = 2
+  final val hitPointWidth= 3d
   val IntersectPattern: Regex = "([CDEFLST])(\\d+)".r
   var isPainting=false
   var downButtons:Int=0
@@ -46,7 +48,8 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
   val scene = new Scene()
   val whiteColor = new Color(0.98d, 0.98d, .98d)
   var camera = new PerspectiveCamera(90, 1, 0.1, 1000)
-  val renderer = new WebGLRenderer(js.Dynamic.literal(alpha = true, clearColor = whiteColor, autoSize = false, antialias = true
+  //var camera=new OrthographicCamera()
+  val renderer = new WebGLRenderer(js.Dynamic.literal(alpha = true, clearColor = whiteColor, autoSize = false, antialias = true,devicePixelratio=window.devicePixelRatio*1,5
   ).asInstanceOf[WebGLRendererParameters])
   val contextListener:scala.scalajs.js.Function1[MouseEvent, Unit]=(e:MouseEvent) => {e.preventDefault()}
   val rayCaster = new Raycaster()
@@ -59,6 +62,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
   val pointerCorrY: Double = -0.5d
   renderer.domElement.style.position="absolute"
   renderer.domElement.style.overflow = "hidden"
+  renderer.devicePixelRatio=window.devicePixelRatio*1.5
   canvHolder.appendChild(hudCanvas)
   canvHolder.appendChild(renderer.domElement)
 
@@ -92,7 +96,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
       controller.rectDragCompleted((downX-currentBounds.left-9.5).toInt,(downY-currentBounds.top).toInt,(e.clientX-currentBounds.left).toInt,(e.clientY-currentBounds.top).toInt,e.ctrlKey,e.shiftKey)
       drawCrossHair(e.clientX,e.clientY)
     } else
-      controller.mouseClicked(MouseButtons.getButton(downButtons), downX, downY, e.ctrlKey)
+      controller.mouseClicked(MouseButtons.getButton(downButtons), downX-currentBounds.left-pointerCorrX, downY-currentBounds.top-pointerCorrY, e.ctrlKey)
     downButtons=0
   }
 
@@ -128,9 +132,9 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
   }
   
   def drawCrossHair(mX:Double,mY:Double):Unit = {
-    val context  =hudCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    val context: CanvasRenderingContext2D =hudCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
     context.globalCompositeOperation = "xor"
-    currentBounds = canvHolder.getBoundingClientRect()
+    currentBounds = renderer.domElement.getBoundingClientRect()
     context.clearRect(0,0,hudCanvas.width,hudCanvas.height)
     context.fillStyle="rgb(0,0,0)"
     context.lineWidth=1
@@ -141,9 +145,33 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     context.moveTo(mX-currentBounds.left-pointerCorrX,0.5)
     context.lineTo(mX-currentBounds.left-pointerCorrX,hudCanvas.height-0.5)
     context.stroke()
+    controller.controllerState match {
+      case ControllerState.AskPoint => drawHitPoints(mX-currentBounds.left-pointerCorrX,mY-currentBounds.top-pointerCorrY,context)
+      case _ =>
+    }
     if(isRectDragging) {
       context.strokeRect(scala.math.min(mX,downX)-currentBounds.left-pointerCorrX,scala.math.min(mY,downY)-currentBounds.top-pointerCorrY,scala.math.abs(mX-downX),scala.math.abs(mY-downY))
     }
+    for (dr <- controller.customDragger) {
+      val pos = if (controller.bracketMode) controller.lastSelectedPoint
+      else new VectorConstant(mX,mY, 0)
+      dr(pos, context)
+    }
+  }
+
+  def drawHitPoints(mX:Double,mY:Double,context:CanvasRenderingContext2D):Unit = {
+    val hitPoints: PointMatchInfo =controller.checkHitPoints(mX,mY,camera)
+    for(hp<-hitPoints.hitBoth){
+      context.strokeStyle="rgb(0,0,200)"
+      context.strokeRect(hp.screenX-hitPointWidth,hp.screenY-hitPointWidth,hitPointWidth*2,hitPointWidth*2)
+    }
+  }
+
+  def drawLine(context:CanvasRenderingContext2D,x1:Double,y1:Double,x2:Double,y2:Double): Unit = {
+    context.beginPath()
+    context.moveTo(x1-currentBounds.left-pointerCorrX,y1-currentBounds.top-pointerCorrY)
+    context.lineTo(x2-currentBounds.left-pointerCorrX,y2-currentBounds.top-pointerCorrY)
+    context.stroke()
   }
 
   def cleanUpCrosshairCanvas(e:MouseEvent):Unit ={
@@ -174,8 +202,9 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
   canvHolder.addEventListener("mouseup", mouseUpListener, useCapture = true)
   canvHolder.addEventListener("mousemove", moveListener, useCapture = true)
 
+
   canvHolder.addEventListener("touchstart", (e: TouchEvent) => {
-    SelectionController.printMessage("touchstart " + e.targetTouches.length + " " + e.targetTouches.item(0).identifier)
+    println("touchstart " + e.targetTouches.length + " " + e.targetTouches.item(0).identifier)
     e.targetTouches.length match {
       case 1 =>
         oldTouches.clear
@@ -183,6 +212,8 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
         oldTouches(t1.identifier) = t1
         touchX1 = e.targetTouches.item(0).clientX
         touchY1 = e.targetTouches.item(0).clientY
+        downX=touchX1
+        downY=touchY1
       case 2 =>
         //SelectionController.printMessage("touchstart ")
         val t1 = e.targetTouches.item(0)
@@ -200,6 +231,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     e.preventDefault()
   })
 
+
   canvHolder.addEventListener("touchmove", (e: TouchEvent) => {
     e.targetTouches.length match {
       case 1 =>
@@ -215,7 +247,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
                 oldTouches.clear()
               }
               oldTouches(t1.identifier) = t1
-            } else controller.mouseClicked(MouseButtons.LEFT, t1.clientX, t1.clientY, controlKey = false)
+            } //else controller.mouseClicked(MouseButtons.LEFT, t1.clientX-currentBounds.left-pointerCorrX, t1.clientY-currentBounds.top-pointerCorrY, controlKey = false)
           case None => SelectionController.printMessage("touchmove touch with identifier not found " + t1.identifier + " oldTouches:" + oldTouches.mkString("|"))
         }
 
@@ -290,11 +322,29 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     //e.preventDefault()
   })
 
-  val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (_: TouchEvent) => {
+  val touchEndListener: scala.scalajs.js.Function1[TouchEvent, Unit] = (e: TouchEvent) => {
+    println("Touchend "+ e.changedTouches.length)
+    e.changedTouches.length match {
+      case 1 =>
+        val t1 = e.changedTouches.item(0)
+        println("touchEnd "+t1.clientX+" "+t1.clientY)
+        oldTouches.get(t1.identifier) match {
+          case Some(oldTouch) =>
+            val d1x = t1.clientX - downX
+            val d1y = t1.clientY - downY
+            if (Math.abs(d1x) < tresh && Math.abs(d1y) < tresh) {
+              controller.mouseClicked(MouseButtons.LEFT, t1.clientX-currentBounds.left-pointerCorrX, t1.clientY-currentBounds.top-pointerCorrY, controlKey = false)
+            }
+          case None => SelectionController.printMessage("touchmove touch with identifier not found " + t1.identifier + " oldTouches:" + oldTouches.mkString("|"))
+        }
+      case _ =>
+    }
   }
 
   canvHolder.addEventListener("touchend", touchEndListener)
-  canvHolder.addEventListener("touchcangel", touchEndListener)
+  canvHolder.addEventListener("touchcancel",(e:TouchEvent)=>{
+    println("touchCancel "+e.changedTouches.length)
+  })
 
 
   def getDir(d: Double): Int = if (Math.abs(d) <= tresh) 0 else if (d < 0d) -1 else 1
@@ -318,9 +368,9 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     hudCanvas.height=h
 
     controller.scaleModel.setViewSize(w,h)
-    renderer.setSize(w * 1.5d, h * 1.5d, updateStyle = false)
-    renderer.domElement.style.width = w + "px"
-    renderer.domElement.style.height = h + "px"
+    renderer.setSize(w /** 1.5d*/, h /** 1.5d*/, updateStyle = false)
+    renderer.domElement.style.width = w.toString + "px"
+    renderer.domElement.style.height = h.toString + "px"
     hudCanvas.style.width=renderer.domElement.style.width
     hudCanvas.style.height=renderer.domElement.style.height
     val oldx = camera.position.x
@@ -328,6 +378,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     val oldz = camera.position.z
     val oldrx = camera.rotation.x
     val oldry = camera.rotation.y
+    //camera=new OrthographicCamera(w.toDouble/ -2,w.toDouble/2,h.toDouble/2,h.toDouble/ -2,.1,1000)
     camera = new PerspectiveCamera(90, w.toDouble / h.toDouble, 0.1, 1000)
     camera.position.x = oldx
     camera.position.y = oldy
@@ -360,6 +411,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
   }
 
   def pickElems(screenX: Double, screenY: Double): js.Array[Reference] = {
+    //println("Pick Elements "+screenX+" , "+screenY)
     val viewBonds = renderer.domElement.getBoundingClientRect()
     var testx=0d
     var testy=0d
@@ -367,30 +419,29 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
 
     def addElement(el:Intersection):Unit= {
       el.`object`.name match {
-        case IntersectPattern(typString, StrToInt(inst)) ⇒
-
+        case IntersectPattern(typString, StrToInt(inst)) =>
           val typ = typString match {
-            case "C" ⇒ GraphElem.ARCTYPE
+            case "C" => GraphElem.ARCTYPE
             case "D" => GraphElem.DIMLINETYP
-            case "E" ⇒ GraphElem.ELLIPSETYP
+            case "E" => GraphElem.ELLIPSETYP
             case "F" => GraphElem.FILLTYPE
-            case "L" ⇒ GraphElem.LINETYPE
+            case "L" => GraphElem.LINETYPE
             case "S" => GraphElem.SYMBOLTYP
             case "T" => GraphElem.TEXTTYP
-            case o ⇒ Log.e("Unknown ElemTyp:" + o); 0
+            case o => Log.e("Unknown ElemTyp:" + o); 0
           }
           resultSet+= Reference(typ, inst)
-        case o ⇒ Log.e("wrong object name " + o); EMPTY_REFERENCE
+        case o => Log.e("wrong object name " + o); EMPTY_REFERENCE
       }
     }
 
     for(i<-0 to 4) {
       i match {
-        case 0 => testx=screenX;testy=screenY
-        case 1 => testx=screenX+pickTreshold;testy=screenY
-        case 2 => testx=screenX-pickTreshold;testy=screenY
-        case 3 => testx=screenX;testy=screenY+pickTreshold
-        case 4 => testx=screenX;testy=screenY-pickTreshold
+        case 0 => testx=screenX+viewBonds.left+pointerCorrX;testy=screenY+viewBonds.top+pointerCorrY
+        case 1 => testx=screenX+viewBonds.left+pointerCorrX+pickTreshold;testy=screenY+screenY+viewBonds.top+pointerCorrY
+        case 2 => testx=screenX+viewBonds.left+pointerCorrX-pickTreshold;testy=screenY+screenY+viewBonds.top+pointerCorrY
+        case 3 => testx=screenX+viewBonds.left+pointerCorrX;testy=screenY+pickTreshold+screenY+viewBonds.top+pointerCorrY
+        case 4 => testx=screenX+viewBonds.left+pointerCorrX;testy=screenY-pickTreshold+screenY+viewBonds.top+pointerCorrY
       }
       pickVector.x = ((testx - viewBonds.left) / viewBonds.width) * 2d - 1d
       pickVector.y = 1d - ((testy - viewBonds.top) / viewBonds.height) * 2d
@@ -398,7 +449,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
       rayCaster.setFromCamera(pickVector, camera)
       val intersects: js.Array[Intersection] = rayCaster.intersectObjects(scene.children)
       //println("r "+i+" intersects:"+intersects.length)
-      for (el: Intersection ← intersects) addElement(el)
+      for (el: Intersection <- intersects) addElement(el)
     }
     val result=new js.Array[Reference]
     for(el<-resultSet) result.push(el)

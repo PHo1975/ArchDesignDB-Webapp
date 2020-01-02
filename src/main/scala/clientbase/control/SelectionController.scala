@@ -1,8 +1,9 @@
 package clientbase.control
 
 import clientbase.connection.{WebObjectClass, WebSocketConnector}
-import clientbase.viewer2d.SelectionDecorable
+import clientbase.viewer2d.{Formatable, SelectionDecorable}
 import definition.data.{EMPTY_OWNERREF, OwnerReference, Referencable, Reference}
+import definition.expression.Constant
 import definition.typ.{AbstractCCD, AbstractObjectClass, AllClasses, SelectGroup}
 
 import scala.collection.mutable
@@ -23,7 +24,30 @@ object SelectionController {
   var lastOwnerRef:Option[Referencable]=None
   var lastPropField:Int= -1
   var createChildDefs:Seq[AbstractCCD]=Seq.empty
-  private val selGroup=new SelectGroup[Referencable](EMPTY_OWNERREF,Seq[Referencable]())
+
+  val lastFormatableSelection: mutable.HashMap[Int, Formatable] = collection.mutable.HashMap[Int, Formatable]()
+
+  protected def storeLastFormatables():Unit =
+    for(group<-currentSelection;el<-group.children)
+      storeFormatable(el)
+
+
+  protected def storeFormatable(el:Referencable):Unit=
+    el match {
+      case fo:Formatable=> lastFormatableSelection(fo.ref.typ)=fo
+      case _=>
+    }
+
+  def getCreationFormatValues(forType:Int): Seq[(Int, Constant)] = {
+    if (lastFormatableSelection.contains(forType)) {
+      val template=lastFormatableSelection(forType)
+      val forClass=AllClasses.get.getClassByID(forType)
+      for(field<-forClass.formatFields) yield (field,template.getFormatFieldValue(field))
+    } else Seq.empty
+  }
+
+
+  protected val selGroup=new SelectGroup[Referencable](EMPTY_OWNERREF,Seq[Referencable]())
 
     lazy val supportsTouch: Boolean = org.scalajs.dom.window.hasOwnProperty("ontouchstart")
 
@@ -33,7 +57,7 @@ object SelectionController {
     focusedElement=Some(owner)
   }
 
-  def select(selection: Seq[SelectGroup[_ <: Referencable]]): Unit = {
+  def select(selection: Iterable[SelectGroup[_ <: Referencable]]): Unit = {
     cellEditor.finishEdit(0, focusTable = false)
     resetOldSelection()
     currentSelection.clear
@@ -42,6 +66,7 @@ object SelectionController {
       list++= ngroup.children
     }
     decorateNewSelection()
+    storeLastFormatables()
     updateCommonClassID()
   }
 
@@ -52,7 +77,8 @@ object SelectionController {
   }
 
 
-  def addSelection(selection: Seq[SelectGroup[_ <: Referencable]],toggle:Boolean): Unit = {
+  def addSelection(selection: Iterable[SelectGroup[_ <: Referencable]],toggle:Boolean): Unit = {
+    println("Add Selection "+selection)
     cellEditor.finishEdit(0, focusTable = false)
 
     for(ngroup<-selection;if ngroup.children.nonEmpty) {
@@ -77,6 +103,7 @@ object SelectionController {
           }
       }
     }
+    storeLastFormatables()
     updateCommonClassID()
   }
 
@@ -105,15 +132,15 @@ object SelectionController {
   }
 
   def resetOldSelection(): Unit =
-    for (cgroup ← currentSelection; elem ← cgroup.children) elem match {
-      case dec: SelectionDecorable ⇒ dec.hideSelection()
-      case _ ⇒
+    for (cgroup <- currentSelection; elem <- cgroup.children) elem match {
+      case dec: SelectionDecorable => dec.hideSelection()
+      case _ =>
     }
 
   def decorateNewSelection(): Unit =
-    for (cgroup ← currentSelection; elem ← cgroup.children) elem match {
-      case dec: SelectionDecorable ⇒ dec.showSelection()
-      case _ ⇒
+    for (cgroup <- currentSelection; elem <- cgroup.children) elem match {
+      case dec: SelectionDecorable => dec.showSelection()
+      case _ =>
     }
 
 
@@ -130,7 +157,7 @@ object SelectionController {
     commonClass match {
       case Some(c) =>
         SidepanelController.setSelection("" + numElems + " " +
-          c.getDescriptionOrName + (if (numElems == 1) " -Objekt" else " -Objekte"+"<br>"+c.fieldEditors.mkString(", ")), c.actions)
+          c.getDescriptionOrName + (if (numElems == 1) " -Objekt" else " -Objekte"/*+"<br>"+c.fieldEditors.mkString(", ")*/), c.actions)
         SidepanelController.loadFieldEditors(c,currentSelection)
       case None =>
         SidepanelController.setSelection(" - ",mutable.LinkedHashMap.empty)
@@ -148,6 +175,7 @@ object SelectionController {
       if(elIx>= 0 ) {
         groupList(elIx)=child
         decorateElem(child)
+        storeFormatable(child)
       }
     }
   }

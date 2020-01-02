@@ -1,6 +1,7 @@
 package clientbase.control
 
 import clientbase.connection.WebSocketConnector
+import clientbase.viewer2d.GraphQuestionHandler
 import definition.data.{Referencable, ResultElement}
 import definition.expression.Constant
 import definition.typ._
@@ -23,23 +24,23 @@ object DialogManager {
   var currentAction:Option[ActionTrait]=None
   var currentQuestion:Option[ParamQuestion]=None
   var repeatQuestion:Option[DialogQuestion]=None
-  var actionGroups:Iterable[SelectGroup[_<:Referencable]] = _
+  var actionGroups:Iterable[SelectGroup[_<:Referencable]] = Seq.empty
 
   var isQuestionRepeating=false
+  var hasRebound=false
   var createType:Option[Int]=None
   var propField:Byte= -1
   var createdNewElements=0
 
-  def dialogIsActive: Boolean = currentQuestion.isDefined
-
-  val answerController=new AnswerController()
+    val answerController=new AnswerController()
   val answerList: ArrayBuffer[ResultElement] = scala.collection.mutable.ArrayBuffer[ResultElement]()
-  var customAnswerListener: List[(Seq[ResultElement] => Unit, Option[ParamQuestion])] = Nil
+  var customAnswerListener: List[(Iterable[ResultElement] => Unit, Option[ParamQuestion])] = Nil
 
 
 
   def startAction(newAction:ActionTrait):Unit={
-    if(currentAction.isDefined)reset()
+    if(dialogIsActive&& ! hasRebound)reset()
+    if(hasRebound) hasRebound=false
     if(SelectionController.currentSelection.nonEmpty) {
       currentAction=Some(newAction)
       newAction.question match {
@@ -55,7 +56,9 @@ object DialogManager {
   }
 
   def startCreateAction(action:ActionTrait,ncreateType:Int,npropField:Byte):Unit ={
-    if(currentAction.isDefined)reset()
+    println("StartCreateAction "+action)
+    if(dialogIsActive&& ! hasRebound)reset()
+    if(hasRebound) hasRebound=false
     action.question match {
       case Some(question)=>
         createdNewElements=0
@@ -68,8 +71,8 @@ object DialogManager {
     }
   }
 
-  def startIntermediateQuestion(question:ParamQuestion,listener:(Seq[ResultElement]) => Unit,storeAnswer:Boolean=true):Unit= {
-    customAnswerListener=(listener,if(!storeAnswer)currentQuestion else None) :: customAnswerListener
+  def startIntermediateQuestion(question:ParamQuestion,listener:(Iterable[ResultElement]) => Unit,storeAnswer:Boolean=true):Unit= {
+    customAnswerListener=((listener,if(!storeAnswer)currentQuestion else None)) :: customAnswerListener
     loadQuestion(question)
   }
 
@@ -78,7 +81,7 @@ object DialogManager {
   protected def createNewElem (actionName:String): Unit = {
     for(lastC<-SelectionController.lastContainer;ownerRef<-lastC.getOwnerRef;ncreateType<-createType) {
       lastC.createActionSubmitted(1)
-      val formatValues = lastC.getCreationFormatValues(createType.get)
+      val formatValues = SelectionController.getCreationFormatValues(createType.get)
       WebSocketConnector.executeCreateAction(ownerRef.ref,propField,ncreateType,actionName,Seq.empty,formatValues)
     }
   }
@@ -88,15 +91,26 @@ object DialogManager {
     currentQuestion=Some(question)
     question match {
       case d: DialogQuestion =>
+        repeatQuestion=if(d.repeat) Some(d) else None
         SidepanelController.showAnswerPanel()
         answerController.loadAnswerDefinitions(d)
+      case c:CommandQuestion=>
+        repeatQuestion=None
+        for(cont<-SelectionController.lastContainer)
+          getCustomQuestionHandler(c.module).load(c,cont)
       case o=> println("Unknown question "+o)
     }
   }
 
+  def dialogIsActive: Boolean =currentQuestion.isDefined
+
   def reset(): Unit = {
-    println("reset currentAction:"+currentAction+"\ncurrentSelection:"+SelectionController.currentSelection)
-    for (_ <- currentAction) {
+    println("reset currentAction:"+currentAction+"\ncurrentSelection:"+SelectionController.currentSelection+" is repeating:"+isQuestionRepeating+" answerlist:"+answerList)
+    if(dialogIsActive) {
+      if(isQuestionRepeating&&answerList.nonEmpty){
+        isQuestionRepeating=false
+        processResults()
+      }
       for(cl<-SelectionController.lastContainer) cl.actionStopped()
       currentAction=None
       //SelectionController.select(currentSelection)
@@ -105,18 +119,21 @@ object DialogManager {
         case _=>
       }
       currentQuestion=None
+      actionGroups=Seq.empty
       isQuestionRepeating=false
+      repeatQuestion=None
       answerList.clear()
       answerController.reset()
       customAnswerListener=Nil
       createType=None
+      SidepanelController.removeAnswerPanel()
       SidepanelController.showFieldEditors()
       SidepanelController.showActionArea()
     }
 
   }
 
-  def answerGiven(adef:AnswerDefinition,result:Constant): Unit = if(currentAction.isDefined){
+  def answerGiven(adef:AnswerDefinition,result:Constant): Unit = if(dialogIsActive && !hasRebound){
     println("Answer given "+adef.name+" = "+result+" "+result.getType)
     val answer=ResultElement(adef.name,result)
     answerList+= answer
@@ -133,7 +150,7 @@ object DialogManager {
           }
         } else {
           val (listener,lastQuestion)=customAnswerListener.head
-          //println("Listener "+listener+" lastQuestion:"+lastQuestion)
+          println("Listener "+listener+" lastQuestion:"+lastQuestion+" numListener"+customAnswerListener.size)
           repeatQuestion match {
             case Some(rQuestion) =>
               isQuestionRepeating = true
@@ -149,7 +166,9 @@ object DialogManager {
                   answerList.remove(answerList.size-1)
                   listener(Seq(answer))
                   loadQuestion(lquestion)
-                case None => listener(answerList)//;processResults()
+                case None =>
+                  //val answerBackup=answerList.clone()
+                  listener(answerList)
               }
           }
         }
@@ -159,24 +178,56 @@ object DialogManager {
 
 
   def processResults(): Unit = {
+    var repeatWithoutCAS=false
+    println("ProcessResults actiongroups "+actionGroups+" createType:"+ createType)
+    if(actionGroups.nonEmpty){
+      currentAction match {
+        case Some(ca) if(ca.question.isDefined&&ca.question.get.repeat)||ca.rebound=>
+          hasRebound=true
+          SelectionController.lastContainer match{
+            case Some(lc) if lc.hasCreateActionStarted=>
+              lc.onCreatedDataReceived(()=>repeatAction(ca,createType,propField))
+            case _=> repeatWithoutCAS=true
+          }
+        case _ => hasRebound=false
+      }
+    }
     createType match {
-      case Some(ct)=>
+      case Some(ctype)=>
          SelectionController.lastContainer match {
           case Some(lc) =>
+            //println("container:"+lc+" currentAction:"+currentAction+" owner:"+lc.getOwnerRef.get.ref)
             lc.createActionSubmitted(if(createdNewElements==0) 1 else createdNewElements)
-            val formatValues=lc.getCreationFormatValues(ct)
-            for(cAction<-currentAction;owner<-lc.getOwnerRef)
-              WebSocketConnector.executeCreateAction(owner.ref,propField,ct,cAction.name,answerList,formatValues)
+            val formatValues: Seq[(Int, Constant)] =SelectionController.getCreationFormatValues(ctype)
+            for(cAction<-currentAction;owner<-lc.getOwnerRef) {
+              println("Execute "+owner.ref+" pr:"+propField+" ctype:"+ctype+" Action:"+cAction.name+" Answers:"+answerList+" format:"+formatValues)
+              WebSocketConnector.executeCreateAction(owner.ref,propField,ctype,cAction.name,answerList,formatValues)
+            }
 
-          case None=> Log.e("Process results, create Type "+ct+" but no last Container")
+          case None=> Log.e("Process results, create Type "+ctype+" but no last Container")
 
         }
       case None => for(action<-currentAction;group <-actionGroups)
         WebSocketConnector.executeAction(group.parent,group.children,action.name,answerList)
     }
-    reset()
+    if(!hasRebound)reset()
+    if(repeatWithoutCAS)
+      for(ca<-currentAction) repeatAction(ca,createType,propField)
   }
+
+  protected def repeatAction(ca: ActionTrait, crType: Option[Int], prField: Byte): Unit =
+    //println("Repeat "+createType+" "+ca.name+" "+ actionGroups+" dialogIsActive:"+dialogIsActive+" "+Thread.currentThread().getName)
+    crType match {
+      case Some(ct)=>startCreateAction(ca,ct,prField)
+      case None =>  startAction(ca)
+    }
+
 
 
   def increaseNumCreatedElements(amount: Int = 1): Unit = createdNewElements += amount
+
+  def getCustomQuestionHandler(moduleType: ModuleType.Value):CustomQuestionHandler= moduleType match {
+    case ModuleType.Graph=>GraphQuestionHandler
+    case o=> throw new IllegalArgumentException("Unknown module "+o)
+  }
 }

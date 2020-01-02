@@ -8,5 +8,5 @@ trait FocusOwner {
   def getNextOwner:Option[FocusOwner]
   def focusFromUp()
   def focusFromBottom()*/
-  def blur()
+  def blur():Unit
 }

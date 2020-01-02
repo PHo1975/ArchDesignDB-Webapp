@@ -25,7 +25,7 @@ object SidepanelController {
   val openCTag="contentopen"
   val closeCTag="contentclosed"
 
-  val switchListener: ArrayBuffer[() ⇒ Unit] = ArrayBuffer[() => Unit]()
+  val switchListener: ArrayBuffer[() => Unit] = ArrayBuffer[() => Unit]()
 
   val switchButton: Button =button(id:="switchbut",tabindex:= -1)("\u2261").render
   var open=false
@@ -67,6 +67,9 @@ object SidepanelController {
     sidePanelRoot.classList.add(openTag)
     contentRoot.classList.add(openCTag)
     switchButton.innerHTML="<"
+    sidePanelRoot.appendChild(selectionArea)
+    sidePanelRoot.appendChild(fieldEditorsDiv)
+    showActionArea()
     notifySwitchListeners()
   }
 
@@ -76,6 +79,10 @@ object SidepanelController {
     sidePanelRoot.classList.add(closeTag)
     contentRoot.classList.add(closeCTag)
     switchButton.innerHTML="\u2261"
+    if (sidePanelRoot.contains(selectionArea)) sidePanelRoot.removeChild(selectionArea)
+    if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
+    if (sidePanelRoot.contains(fieldEditorsDiv))sidePanelRoot.removeChild(fieldEditorsDiv)
+    if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
     notifySwitchListeners()
   }
 
@@ -84,24 +91,17 @@ object SidepanelController {
     //println("switch onclick "+e)
     if(open) {
       doClose()
-      if (sidePanelRoot.contains(selectionArea)) sidePanelRoot.removeChild(selectionArea)
-      if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)
-      if (sidePanelRoot.contains(fieldEditorsDiv))sidePanelRoot.removeChild(fieldEditorsDiv)
-      if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
     }
     else {
       doOpen()
-      sidePanelRoot.appendChild(selectionArea)
-      sidePanelRoot.appendChild(fieldEditorsDiv)
-      showActionArea()
     }
     open= !open
   }}
 
   def setSelection(text: String, actions: mutable.LinkedHashMap[String, ActionTrait]): Unit = {
     println("set selection "+text+" actions:"+actions.size)
-    if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
 
+    removeAnswerPanel()
     if (open && !sidePanelRoot.contains(actionArea)) sidePanelRoot.appendChild(actionArea)
     //sidePanelRoot.appendChild(FieldEditorPanel.mainDiv)
     currentActions=actions
@@ -130,13 +130,13 @@ object SidepanelController {
 
   def showActionArea():Unit=sidePanelRoot.appendChild(actionArea)
 
-    def panelPart(lname:String,partComp:HTMLElement):Div={
+  def panelPart(lname:String,partComp:HTMLElement):Div={
     val elem=div(`class`:="panelpart")(div(`class`:="panel-label")(lname),partComp).render
     partComp.classList.add(panelCompTag)
     elem
   }
 
-  def loadFieldEditors(theClass:AbstractObjectClass, groupList:Seq[SelectGroup[_ <: Referencable]]): Unit = {
+  def loadFieldEditors(theClass:AbstractObjectClass, groupList:Iterable[SelectGroup[_ <: Referencable]]): Unit = {
     //println("Show Field Editors "+theClass.name)
     clearFieldEditors()
     for (ed<-theClass.fieldEditors;if fieldEditorMap.contains(ed)) {
@@ -155,5 +155,7 @@ object SidepanelController {
   def hideFieldEditors():Unit=fieldEditorsDiv.style.visibility="hidden"
 
   def showFieldEditors():Unit=fieldEditorsDiv.style.visibility="visible"
+
+  def removeAnswerPanel():Unit=if (sidePanelRoot.contains(DialogManager.answerController.panel)) sidePanelRoot.removeChild(DialogManager.answerController.panel)
 
 }

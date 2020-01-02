@@ -61,22 +61,22 @@ abstract class GraphElem(override val ref: Reference, val color: Int) extends Fo
   def geometry:js.Array[Object3D]
 
   def showSelection(): Unit = for(obj<-geometry) obj match {
-    case m: Mesh ⇒ m.material = GraphElem.selectMaterial
-    case _ ⇒
+    case m: Mesh => m.material = GraphElem.selectMaterial
+    case _ =>
   }
 
   def hideSelection(): Unit = {
     println("hideselection "+ref)
     for(obj<-geometry) obj match {
-    case m: Mesh ⇒ m.material = GraphElem.getMaterial(color)
-    case _ ⇒
+    case m: Mesh => m.material = GraphElem.getMaterial(color)
+    case _ =>
   }}
 }
 
 class GraphElemStub(override val ref:Reference) extends GraphElem(ref,0)  {
   def getFormatFieldValue(fieldNr:Int):Constant=EMPTY_EX
   def getBounds(container: ElemContainer): Bounds =GraphElem.NULLRECT
-  def getHitPoints(container:ElemContainer):Seq[VectorConstant]=Seq.empty
+  def getHitPoints(container:ElemContainer):Iterable[VectorConstant]=Seq.empty
 
   def createGeometry(container:ElemContainer): Unit = {}
   //def hideSelection(): Unit = {}
@@ -111,7 +111,7 @@ abstract class AbstractLineElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlin
   override def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit =
     GraphElem.calcScreenBoundsfrom2Points(startPoint,endPoint,camera,res)
 
-  def getHitPoints(container:ElemContainer)=hitPoints
+  def getHitPoints(container:ElemContainer): List[VectorConstant] =hitPoints
 
   override def getBounds(container: ElemContainer): Bounds = this
 }
@@ -152,7 +152,7 @@ case class ArcElement(nref:Reference,ncolor:Int,nlineWidth:Int,nlineStyle:Int,ce
     new VectorConstant(centerPoint.x+scala.math.cos(angle*scala.math.Pi/180d)*diameter,
       centerPoint.y+scala.math.sin(angle*scala.math.Pi/180d)*diameter,0)
 
-  protected def createBoundsPoints: Seq[VectorConstant] = {
+  protected def createBoundsPoints: ArrayBuffer[VectorConstant] = {
     if(cornerPoints.isEmpty) {
       cornerPoints += points.head += points.tail.head
       val sa = startAngle % 360d
@@ -203,7 +203,7 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
     math.atan(math.tan(outerAngle) * (r1 + delta) / (r2 + delta))
 
   lazy val points: Seq[VectorConstant] = List(pointFromAngle(startAngle * math.Pi / 180d), pointFromAngle(endAngle * math.Pi / 180d), centerPoint)
-  def getHitPoints(container:ElemContainer): Seq[VectorConstant] =points
+  def getHitPoints(container:ElemContainer): Iterable[VectorConstant] =points
   protected lazy val bounds: Bounds = calcBounds
   protected val cornerPoints: ArrayBuffer[VectorConstant] =ArrayBuffer[VectorConstant]()
 
@@ -362,7 +362,7 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
     case _ => null
   }
 
-  override def getHitPoints(container: ElemContainer): Seq[VectorConstant] = getHitPoints(container)
+  override def getHitPoints(container: ElemContainer): Iterable[VectorConstant] = getCornerPoints(container)
 }
 
 
@@ -492,7 +492,7 @@ object GraphElem {
     }
   }
 
-  def getPointsBounds(points:Seq[VectorConstant]):BRect =
+  def getPointsBounds(points:ArrayBuffer[VectorConstant]):BRect =
     if(points==null && points.isEmpty) {Log.e("getPointBounds "+points);null}
     else 	{
       var x1=points.head.x
@@ -531,12 +531,12 @@ object GraphElem {
   })
 
 
-  def calcBounds(list:TraversableOnce[GraphElem],controller:ElemContainer):BRect= {
+  def calcBounds(list:IterableOnce[GraphElem],controller:ElemContainer):BRect= {
     var x1:Double=Short.MaxValue
     var y1:Double=Short.MaxValue
     var x2:Double=Short.MinValue
     var y2:Double=Short.MinValue
-    for(el<-list) el match {
+    for(el<-list.iterator) el match {
       case _:GraphElemStub=>
       case g:GraphElem=>
         val l=g.getBounds(controller)

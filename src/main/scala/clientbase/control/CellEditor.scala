@@ -65,7 +65,7 @@ class CellEditor {
       justOpened=true
       pNode.removeChild(pNode.firstChild)
       pNode.appendChild(cell)
-      cell.style.setProperty("width",(width-4)+"px")
+      cell.style.setProperty("width",(width-4).toString+"px")
       cell.style.setProperty("height","")
       cell.focus()
       parentNode = Some(pNode)

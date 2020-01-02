@@ -41,8 +41,8 @@ trait FocusContainer {
   /** Format Field Values to give to a new created Object
    * @param forType class type of the object to create
    * @return list of (formatfieldNr,FieldValue)
-   */
-  def getCreationFormatValues(forType:Int):Seq[(Int,Constant)]=Nil
+
+  def getCreationFormatValues(forType:Int):Seq[(Int,Constant)]=Nil*/
 
   def actionStopped():Unit = {}
 

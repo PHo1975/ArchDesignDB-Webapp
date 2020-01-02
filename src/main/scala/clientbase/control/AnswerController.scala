@@ -16,6 +16,7 @@ class AnswerController {
 
   cancelButton.onclick= _ =>{
     DialogManager.reset()
+    reset()
   }
 
   def loadAnswerDefinitions(question:ParamQuestion):Unit= {

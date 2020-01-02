@@ -1,6 +1,7 @@
 package clientbase.viewer2d
 
 import definition.data.{Referencable, Reference}
+import definition.expression.{NULLVECTOR, VectorConstant}
 import definition.typ.SelectGroup
 import util.Log
 
@@ -15,6 +16,8 @@ class LayerList(controller:Viewer2DController) {
   val subscriberList: ArrayBuffer[LayerSubscriber] =ArrayBuffer[LayerSubscriber]()
   var loaded=false
   var activeLayer: Option[LayerSubscriber] = None
+
+  val tempElements: ArrayBuffer[GraphElem] =ArrayBuffer[GraphElem]()
 
   def loadLayers(nlist:Iterable[Referencable ]):Unit= {
     shutDown()
@@ -58,7 +61,7 @@ class LayerList(controller:Viewer2DController) {
     if (lay.visible) {
       lay.hide()
       lay.setEditable(false)
-      for (f ← activeLayer; if f == lay) {
+      for (f <- activeLayer; if f == lay) {
         f.setActive(false)
         activeLayer = None
       }
@@ -67,7 +70,7 @@ class LayerList(controller:Viewer2DController) {
 
   def toggleEditable(lay: LayerSubscriber): Unit = {
     if (lay.editable) {
-      for (f ← activeLayer; if f == lay) {
+      for (f <- activeLayer; if f == lay) {
         f.setActive(false)
         activeLayer = None
       }
@@ -99,7 +102,7 @@ class LayerList(controller:Viewer2DController) {
   def readyLoaded():Unit={
     println("ready Loaded"+subscriberList.size)
     loaded=true
-    for (l ← subscriberList.headOption) setActiveLayer(l)
+    for (l <- subscriberList.headOption) setActiveLayer(l)
     controller.readyLoaded()
   }
 
@@ -126,7 +129,7 @@ class LayerList(controller:Viewer2DController) {
     editableLayers.flatMap(_.filterSelection(intersection)).toSeq
 
 
-  def filterElements(onlyEdible:Boolean,filterFunc:GraphElem=>Boolean):Seq[SelectGroup[GraphElem]]= {
+  def filterElements(onlyEdible:Boolean,filterFunc:GraphElem=>Boolean):Iterable[SelectGroup[GraphElem]]= {
     val ret1 = subscriberList.flatMap(a=>
       if(onlyEdible && !a.editable) Seq.empty
       else {
@@ -137,6 +140,9 @@ class LayerList(controller:Viewer2DController) {
     ret1
   }
 
-
+  def iterateVisiblePoints(container:ElemContainer,func:VectorConstant=>Unit):Unit = {
+    func(NULLVECTOR)
+    for(layer<-subscriberList;if layer.visible) layer.iterateVisiblePoints(container,func)
+  }
 
 }

@@ -1,14 +1,14 @@
 package clientbase.viewer2d
 
-import clientbase.connection.WebSocketConnector
-import clientbase.control.{FocusContainer, SelectionController}
+import clientbase.control.{FocusContainer, PointClickListener, SelectionController}
 import clientbase.tilelayout.TileContent
 import definition.data.{Referencable, Reference}
 import definition.expression.{NULLVECTOR, VectorConstant}
-import definition.typ.{AbstractCCD, SelectGroup}
+import definition.typ.SelectGroup
 import org.denigma.threejs.{Camera, Object3D, Vector3}
-import org.scalajs.dom.html.{Button, Canvas, Div, Select}
-import org.scalajs.dom.raw.{ClientRect, Event, HTMLElement, MouseEvent}
+import org.scalajs.dom.CanvasRenderingContext2D
+import org.scalajs.dom.html.Div
+import org.scalajs.dom.raw.{ClientRect, HTMLElement}
 import scalatags.JsDom.all._
 import util.Log
 
@@ -26,15 +26,24 @@ object ControllerState extends Enumeration {
   val DragDrop: ControllerState.Value = Value("DragDrop")
 }
 
+object Viewer2DController{
+  val tempElementColor: Int =255<<16+30<<8
+}
+
 trait AbstractViewerController extends FocusContainer {
   def focus():Unit
   def resetPointSelection():Unit
-  def askForPoint():Unit
+  def askForPoint(el:PointClickListener):Unit
   def bracketPointer:VectorConstant
   def startBracketMode():Unit
   def bracketMode:Boolean
+  def clearTempElements():Unit
+  def addTempElement(newElem:GraphElem):Unit
 }
 
+
+case class HitInfo(worldPos:VectorConstant, screenX:Double, screenY:Double)
+case class PointMatchInfo(hitBoth:Option[HitInfo],hitX:Option[HitInfo],hitY:Option[HitInfo])
 
 class Viewer2DController extends AbstractViewerController with TileContent with ElemContainer {
   val layerPan = new LayerListPan(this)
@@ -45,6 +54,12 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
   val scaleModel=new ScaleModel
   val canvasHolder: Div = div(`class` := "viewer2dcanvas",tabindex:="0")(/*horCross, vertCross,selectRectangle*/).render
   val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
+  var customDragger:Option[(VectorConstant,CanvasRenderingContext2D)=>Unit]=None
+  var lastSelectedPoint:VectorConstant=NULLVECTOR
+  var pointClickListener :Option[PointClickListener]=None
+  var _hasCreateActionStarted=false
+  var numCreatedElements=0
+  final val pointCatchDistance=8d
 
   override val content: HTMLElement = div(`class`:="viewer2dcontent")(layerPan.pane,toolbar.toolbarDiv , canvasHolder).render
 
@@ -52,7 +67,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
   var controllerState: ControllerState.Value = ControllerState.SelectElems
 
   def scaleRatio:Double=  scaleModel.relativeScaleValue
-  def scaleToString(rel: Double): String = if (rel < 1) "1 : " + math.round(1d / rel) else math.round(rel) + " : 1"
+  def scaleToString(rel: Double): String = if (rel < 1) "1 : " + math.round(1d / rel) else math.round(rel).toString + " : 1"
 
   // init from parent Tile
   override def init(selection: Iterable[Referencable]): Unit =
@@ -109,17 +124,28 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
 
   def mouseClicked(button: MouseButtons.Value, screenx: Double, screeny: Double, controlKey: Boolean): Unit =
     button match {
-      case MouseButtons.LEFT ⇒
+      case MouseButtons.LEFT =>
+        println("clicked "+controllerState+" pos:"+screenx+","+screeny)
         controllerState match {
-          case ControllerState.SelectElems ⇒
+          case ControllerState.SelectElems =>
             val elems: js.Array[Reference] = canvasHandler.pickElems(screenx, screeny)
             val newSelection: Seq[SelectGroup[_ <: Referencable]] = layerList.decodeSelection(elems)
-            if (controlKey) {SelectionController.addSelection(newSelection,toggle = true)}
+            if (controlKey) {
+              SelectionController.addSelection(newSelection, toggle = true)
+            }
             else SelectionController.select(newSelection)
             dataUpdated()
-          case _ ⇒
+          case ControllerState.AskPoint =>
+            for (li <- pointClickListener) {
+              val hitPos = checkHitPoints(screenx, screeny, canvasHandler.camera)
+              //resetState()
+              if (li.forcePrecision)
+                for (p <- hitPos.hitBoth)
+                  li.pointClicked(p.worldPos)
+            }
+          case _ =>
         }
-      case _ ⇒
+      case _ =>
     }
 
   def rectDragCompleted (startPointx:Int,startPointy:Int,endPointx:Int,endPointy:Int,controlKey:Boolean,shiftKey:Boolean): Unit ={
@@ -130,7 +156,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     }
   }
 
-  def toScreenPosition(x:Double,y:Double,camera:Camera):Vector3 = {
+  def toScreenPosition(x:Double,y:Double):Vector3 = {
     val vector: Vector3 = new Vector3()
     val viewBonds: ClientRect = canvasHandler.renderer.domElement.getBoundingClientRect()
     val widthHalf= 0.5*viewBonds.width
@@ -139,11 +165,45 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     vector.x=x
     vector.y=y
     vector.z=0
-    vector.project(camera)
-    vector.x=vector.x*widthHalf+widthHalf
-    vector.y= -vector.y*heightHalf+heightHalf
+    vector.project(canvasHandler.camera)
+    vector.x=vector.x*widthHalf+widthHalf+canvasHandler.currentBounds.left+canvasHandler.pointerCorrX
+    vector.y= -vector.y*heightHalf+heightHalf+canvasHandler.currentBounds.top+canvasHandler.pointerCorrY
     vector
   }
+
+  def checkHitPoints(mouseX:Double,mouseY:Double,camera:Camera):PointMatchInfo={
+    val vector: Vector3 = new Vector3()
+    val viewBonds: ClientRect = canvasHandler.renderer.domElement.getBoundingClientRect()
+    val widthHalf= 0.5*viewBonds.width
+    val heightHalf= 0.5*viewBonds.height
+    val catchDistance: Double =pointCatchDistance/widthHalf
+    val px=(mouseX-widthHalf)/widthHalf
+    val py= -1.0*(mouseY-heightHalf)/heightHalf
+
+    var bestHitPoint:Option[HitInfo]=None
+    var bestHitDistance:Double=Double.MaxValue
+
+
+    layerList.iterateVisiblePoints(this,point => {
+      vector.x=point.x
+      vector.y=point.y
+      vector.z=0
+      vector.project(camera)
+      val hitX=Math.abs(vector.x-px)<catchDistance
+      val hitY=Math.abs(vector.y-py)<catchDistance
+      //if(hitY) println("hit y"+point +" cd:"+catchDistance+" py:"+py+" vy:"+vector.y)
+      if(hitX&&hitY) {
+        val dist=Math.sqrt((vector.x-px)*(vector.x-px)+(vector.y-py)*(vector.y-py))
+        if (dist<bestHitDistance) {
+          bestHitDistance=dist
+          bestHitPoint=Some(HitInfo(point,vector.x*widthHalf+widthHalf,-vector.y*heightHalf+heightHalf))
+        }
+        //println("Hit dist:"+dist+" hitinfo:"+bestHitPoint)
+      }
+    })
+    PointMatchInfo(bestHitPoint,None,None)
+  }
+
 
   def checkSelection(startPointx:Int,startPointy:Int,endPointx:Int,endPointy:Int,controlKey:Boolean): Unit = {
     val viewBonds: ClientRect = canvasHandler.renderer.domElement.getBoundingClientRect()
@@ -155,7 +215,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     val maxY=scala.math.max(startPointy,endPointy)
     val boundsContainer=new BoundsContainer
     //println("Check Select minx:"+minX+" maxX:"+maxX+" miny:"+minY+" maxY:"+maxY)
-    val elList: Seq[SelectGroup[_ <: Referencable]] =layerList.filterElements(onlyEdible = true, graphElem=>{
+    val elList: Iterable[SelectGroup[_ <: Referencable]] =layerList.filterElements(onlyEdible = true, graphElem=>{
       graphElem.calcScreenBounds(this,canvasHandler.camera,boundsContainer)
       if(! boundsContainer.isEmpty) {
         val screenMinX = boundsContainer.minX * widthHalf + widthHalf
@@ -184,6 +244,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
 
 
   def resetState(): Unit = {
+    //println("2d-Controller reset state")
     controllerState match {
       case ControllerState.AskPoint =>
       case _ =>
@@ -191,6 +252,8 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
     controllerState=ControllerState.SelectElems
     bracketMode=false
     canvasHandler.repaint()
+    //customDragger=None
+    pointClickListener=None
   }
 
   def focus():Unit = canvasHolder.focus()
@@ -198,28 +261,65 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
      resetState()
   }
 
-  def askForPoint():Unit = {
+  def askForPoint(listener:PointClickListener):Unit = {
     resetState()
+    pointClickListener=Some(listener)
     controllerState=ControllerState.AskPoint
-    println("ask for point")
+    //println("ask for point")
   }
 
   override def startBracketMode(): Unit = {
     bracketMode=true
   }
 
-
-
-
   override def containerName: String = "Graph2DEdit"
-
   override def getOwnerRef: Option[Referencable] =  layerList.activeLayer
-
   override def requestFocus(): Unit = canvasHolder.focus()
 
-  override def actionStopped():Unit = resetState()
+  override def actionStopped():Unit = {
+    resetState()
+    clearTempElements()
+    customDragger=None
+  }
+  override def lostSelection():Unit ={
+    canvasHandler.repaint()
+    clearTempElements()
+  }
 
-  override def lostSelection():Unit =canvasHandler.repaint()
+  def setCustomDragger(ncustomDragger:(VectorConstant,CanvasRenderingContext2D)=>Unit):Unit ={
+    customDragger=Some(ncustomDragger)
+  }
 
+  override def clearTempElements(): Unit = {
+    for(el<-layerList.tempElements;geom<-el.geometry)
+      canvasHandler.removeGeometry(geom)
+    layerList.tempElements.clear()
+  }
 
+  override def addTempElement(newElem: GraphElem): Unit = {
+    layerList.tempElements+=newElem
+    newElem.createGeometry(this)
+    canvasHandler.repaint()
+  }
+
+  override def createActionSubmitted(numElements:Int): Unit ={
+    _hasCreateActionStarted=true
+    numCreatedElements=numElements
+  }
+
+  override def resetCreateAction(): Unit ={
+    super.resetCreateAction()
+    _hasCreateActionStarted=false
+    numCreatedElements=0
+  }
+
+  def graphElemAdded(lay:LayerSubscriber,elem:GraphElem): Unit ={
+    println("GraphElemAdded lay: "+lay+" elem: "+elem)
+    if(hasCreateActionStarted) {
+      numCreatedElements-= 1
+      val selection=SelectGroup(lay.ownerReference,Seq(elem))
+      SelectionController.addSelection(List(selection),toggle=false)
+      if(numCreatedElements<1)   createdDataReceived()
+    }
+  }
 }

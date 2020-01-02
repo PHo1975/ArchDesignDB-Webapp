@@ -1,16 +1,28 @@
 package clientbase.control
 
 import clientbase.viewer2d.AbstractViewerController
+import definition.expression.VectorConstant
 import definition.typ.AnswerDefinition
 import org.scalajs.dom.html.Button
 import org.scalajs.dom.raw.{Event, Node}
 import scalatags.JsDom.all._
 
-class PointAnswerPanel extends AnswerPanel {
-  var viewController:Option[AbstractViewerController]=None
+trait BracketListener{
+  def bracketModeStarted():Unit
+}
 
+trait PointClickListener extends BracketListener {
+  def pointClicked(point:VectorConstant): Unit
+  def forcePrecision: Boolean
+}
+
+class PointAnswerPanel extends AnswerPanel with PointClickListener {
+  var viewController:Option[AbstractViewerController]=None
+  var internPointClickListener:Option[(VectorConstant)=>Unit]=None
+  var forcePrecision: Boolean = true
 
   override def reset(): Unit = {
+    internPointClickListener=None
   }
 
   override def focus(): Unit = for(vc<-viewController) vc.focus()
@@ -49,13 +61,30 @@ class PointAnswerPanel extends AnswerPanel {
 
 
   override def loadAnswerParam(nanswerDefinition: AnswerDefinition): Node = {
+    reset()
     super.loadAnswerParam(nanswerDefinition)
     for (lc<-SelectionController.lastContainer) lc match {
       case vc:AbstractViewerController=>
         viewController=Some(vc)
-        vc.askForPoint()
+        vc.askForPoint(this)
       case e=> println("PointAnswerPanel load answer, wrong last container "+e)
     }
      panel
   }
+
+  override def pointClicked(point: VectorConstant): Unit =
+    internPointClickListener match{
+      case Some(listener)=> internPointClickListener=None; listener(point)
+      case None => DialogManager.answerGiven(answerDefinition,point)
+  }
+
+
+  override def bracketModeStarted(): Unit = {
+
+  }
+}
+
+object PointAnswerPanel {
+  val STRICT_HIT = "strict"
+  val NOSTRICT_HIT = "nostrict"
 }
