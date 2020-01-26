@@ -1,6 +1,5 @@
 package clientbase.tableview
 
-
 import clientbase.connection.{ColumnInfo, TableSettings, WebSocketConnector}
 import clientbase.control._
 import definition.data.{EMPTY_OWNERREF, InstanceData, OwnerReference, Reference}
@@ -16,9 +15,6 @@ import util.{Log, StrToInt}
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
-
-
-
 
 /**
  * Created by Peter Holzer on 05.07.2015.

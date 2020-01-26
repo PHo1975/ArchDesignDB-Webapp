@@ -44,45 +44,53 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
   protected def loadPropFields(topRef:Reference):Unit = {
     SelectionController.deselect()
     ref=topRef
-    val prFields=AllClasses.get.getClassByID(topRef.typ).propFields
-    def loop(prIx:Int):Unit= if(prIx<prFields.size){
-      val propField=prFields(prIx)
-      if(!propField.hidden) {
-        val createClasses=propField.createChildDefs.filter(a=>a.editorName==""&&a.action.isEmpty)
-        val rowDiv = div(overflow := "hidden", clear := "both").render
-        rowDiv.appendChild(p(`class`:="prfieldtitle")(propField.name+":").render)
-        if(createClasses.nonEmpty){
-          def clearButtons(): Unit ={
-            val numChild=rowDiv.childElementCount
-            for(_<-2 until numChild)
-              rowDiv.removeChild(rowDiv.children(2))
+    println("load ref "+ref)
+    if(PluginModules.contains(ref.typ)) {
+      val module=PluginModules(ref.typ)
+      println("load Module "+module)
+      contentNode.appendChild(module.content)
+      module.load(ref)
+    } else {
+      val prFields = AllClasses.get.getClassByID(topRef.typ).propFields
+
+      def loop(prIx: Int): Unit = if (prIx < prFields.size) {
+        val propField = prFields(prIx)
+        if (!propField.hidden) {
+          val createClasses = propField.createChildDefs.filter(a => a.editorName == "" && a.action.isEmpty)
+          val rowDiv = div(overflow := "hidden", clear := "both").render
+          rowDiv.appendChild(p(`class` := "prfieldtitle")(propField.name + ":").render)
+          if (createClasses.nonEmpty) {
+            def clearButtons(): Unit = {
+              val numChild = rowDiv.childElementCount
+              for (_ <- 2 until numChild)
+                rowDiv.removeChild(rowDiv.children(2))
+            }
+
+            def showNewClasses(): Unit = {
+              clearButtons()
+              for (cr <- createClasses)
+                rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => {
+                  WebSocketConnector.createInstance(cr.childClassID, Array(new OwnerReference(prIx, topRef)), _ => {})
+                  clearButtons()
+                }
+                })(cr.childName).render)
+            }
+
+            if (WebSocketConnector.editable) rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => showNewClasses() })("Neu...").render)
           }
-          def showNewClasses(): Unit ={
-            clearButtons()
-            for(cr<-createClasses)
-              rowDiv.appendChild(button(`class`:="prfield-createbutton",onclick:={()=>{
-                WebSocketConnector.createInstance(cr.childClassID,Array(new OwnerReference(prIx,topRef)),_=>{})
-                clearButtons()
-              }})(cr.childName).render)
-          }
-
-          if (WebSocketConnector.editable) rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => showNewClasses() })("Neu...").render)
-        }
-        contentNode.appendChild(rowDiv)
-        val divNode=div(`class`:="prfielddiv").render
-        contentNode.appendChild(divNode)
-        val propModel=new PropertyModel(topRef,prIx,contentNode,subsID,()=>{loop(prIx+1)},propField.single,propField.allowedClass,this)
-        propList+=propModel
-        WebSocketConnector.createSubscription(topRef,prIx,propModel)
-      } else loop(prIx+1)
-    } //else Log.w("path ready loaded")
-
-    loop(0)
-
-
+          contentNode.appendChild(rowDiv)
+          val divNode = div(`class` := "prfielddiv").render
+          contentNode.appendChild(divNode)
+          val propModel = new PropertyModel(topRef, prIx, contentNode, subsID, () => {
+            loop(prIx + 1)
+          }, propField.single, propField.allowedClass, this)
+          propList += propModel
+          WebSocketConnector.createSubscription(topRef, prIx, propModel)
+        } else loop(prIx + 1)
+      } //else Log.w("path ready loaded")
+      loop(0)
+    }
   }
-
-
 
   override def onUpdate(data: Iterator[InstanceData]): Unit = {
     println("on update ")
@@ -96,7 +104,6 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
       case ix=> parentNode.replaceChild(createPathButton(data,ix,data.ref==oldData.last.ref),
         parentNode.childNodes.item(ix))
     }
-
   }
 
   override def onDelete(data: Reference): Unit = {}

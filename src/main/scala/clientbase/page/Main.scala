@@ -4,19 +4,23 @@ import clientbase.connection.WebSocketConnector
 import clientbase.control.SidepanelController
 import clientbase.tilelayout.{ContentFactory, Tile}
 import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, LineStyleHandler, Viewer2DController}
-import org.scalajs.dom.document
+import org.scalajs.dom.{document, window}
 import org.scalajs.dom.raw.HTMLElement
 import util.Log
 
+import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 import scala.util.control.NonFatal
 
 
 /**
  * Created by Peter Holzer on 05.04.2015.
  */
+
 object Main {
-  def main(args: Array[String]): Unit = {
-    //println("main ready "+window.location.href+"|"+window.location.pathname)
+
+  def main(args: Array[String]): Unit = start
+  @JSExportTopLevel("foo") def start()={
+    println("main ready "+window.location.href+"|"+window.location.pathname)
 
     try {
       val mainPanel = document.getElementById("mainpanel").asInstanceOf[HTMLElement]
