@@ -66,7 +66,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val lineStyle = Expression.read(in).getValue
           val startPoint = Expression.read(in).getValue.toVector
           val endPoint = Expression.read(in).getValue.toVector
-          val owners = InstanceData.readOwners(in)
+          val owners = InstanceData.readOwners(in,itemRef)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
           LineElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, startPoint, endPoint)
@@ -81,7 +81,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val diameter = Expression.read(in).getValue.toDouble
           val startA = Expression.read(in).getValue.toDouble
           val endA = Expression.read(in).getValue.toDouble
-          val owners = InstanceData.readOwners(in)
+          val owners = InstanceData.readOwners(in,itemRef)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
           ArcElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, diameter, startA, endA)
@@ -98,7 +98,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val mainAngle = Expression.read(in).getValue.toDouble
           val startA = Expression.read(in).getValue.toDouble
           val endA = Expression.read(in).getValue.toDouble
-          val owners = InstanceData.readOwners(in)
+          val owners = InstanceData.readOwners(in,itemRef)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
           EllipseElement(itemRef, color.toInt, lineWidth.toInt, lineStyle.toInt, centerPoint, r1, r2, mainAngle, startA, endA)
@@ -115,7 +115,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
             val tangle=Expression.read(in).getValue.toDouble
             val obAngle=Expression.read(in).getValue.toDouble
             val lineSpace=Expression.read(in).getValue.toDouble
-            InstanceData.readOwners(in)
+            InstanceData.readOwners(in,itemRef)
             InstanceData.readSecondUseOwners(in)
             in.readBoolean
             //println("load text "+ref+" "+text)
@@ -132,7 +132,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
             val refPoint=Expression.read(in).getValue.toVector
             val refDist=Expression.read(in).getValue.toDouble
             val precision=Expression.read(in).getValue.toDouble
-            InstanceData.readOwners(in)
+            InstanceData.readOwners(in,itemRef)
             InstanceData.readSecondUseOwners(in)
             in.readBoolean
             new DimLineElement(itemRef,color,position,style,angle,refPoint,refDist,precision,points)
@@ -148,7 +148,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
           val startPoint = Expression.read(in).getValue.toVector
           val angle = Expression.read(in).getValue.toDouble
 
-          InstanceData.readOwners(in)
+          InstanceData.readOwners(in,itemRef)
           InstanceData.readSecondUseOwners(in)
           in.readBoolean
           new FillElement(itemRef,color,lineWidth,lineStyle,fill,Math.abs(hatch),hatch < 0,points,startPoint,angle)
@@ -162,7 +162,7 @@ class LayerSubscriber(val layerRef: Reference, controller: Viewer2DController) e
             val scale=Expression.read(in).getValue.toDouble
             val paramString=Expression.read(in).getValue.toString
             val pos=Expression.read(in).getValue.toVector
-            InstanceData.readOwners(in)
+            InstanceData.readOwners(in,itemRef)
             InstanceData.readSecondUseOwners(in)
             in.readBoolean
             new SymbolElem(itemRef,color,stampRef,angle,scale,pos,paramString)

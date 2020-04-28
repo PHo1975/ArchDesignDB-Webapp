@@ -29,7 +29,8 @@ trait FieldEditor {
 
   def init(): Unit = if (!inited) {
     inited=true
-    allowedClassIds=allowedClassNames.map(a => a -> AllClasses.get.getClassIDByName(a) ).toMap
+    val ac=AllClasses.get
+    allowedClassIds=allowedClassNames.filter(ac.exists).map(a => a -> AllClasses.get.getClassIDByName(a) ).toMap
       for(f<-fieldComponents)
         f.createFieldMap(allowedClassIds)
     //println("Fieldeditor settings done")
@@ -37,14 +38,17 @@ trait FieldEditor {
   }
 
   def storeValue[A](newValue: A, component: SidePanelComponent[A]): Unit = {
-    //println("store Value" +newValue+" comp:"+component.getClass+" datasize:"+dataList.size+" typMap:"+component.fieldMap)
+    println("store Value:" +newValue+" comp:"+component.getClass.getName+" datasize:"+dataList.size+" typMap:"+component.fieldMap)
     val instList=dataList.flatMap(_.children.filter(inst=>component.fieldMap.contains(inst.ref.typ )))
     if(instList.nonEmpty){
       val newConstant=component.getConstant(newValue)
       val typedMap: Map[Int, Iterable[Referencable]] =instList.groupBy(_.ref.typ)
       val keySet=typedMap.keySet
+      println("constant:"+newConstant)
+      println("instList:"+instList.mkString(", ")+ " keyset "+keySet.map(component.fieldMap(_)))
+
       /*TODO */
-      if(keySet.map(aType=>component.fieldMap(aType)).size==1) // all types have the same field Number to change
+      if(keySet.map(component.fieldMap(_)).size==1) // all types have the same field Number to change
         WebSocketConnector.writeInstancesField(instList,component.fieldMap(instList.head.ref.typ),newConstant) //write together
       else for(typ <-keySet) // write for distinct types separately
         WebSocketConnector.writeInstancesField(typedMap(typ),component.fieldMap(typ),newConstant)

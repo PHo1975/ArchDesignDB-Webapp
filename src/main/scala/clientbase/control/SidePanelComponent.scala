@@ -2,7 +2,7 @@ package clientbase.control
 
 import definition.data.{InstanceData, Referencable}
 import definition.expression._
-import definition.typ.DataType
+import definition.typ.{AllClasses, DataType}
 import org.scalajs.dom
 import org.scalajs.dom.html.{Input, Select}
 import org.scalajs.dom.raw.Event
@@ -23,7 +23,8 @@ trait SidePanelComponent[A] {
   /**
   * @param nameMap map aus erlaubten ClassenNamen und zugehörigen Typ-IDs
 */
-  def createFieldMap(nameMap: Map[String, Int]): Unit = fieldMap = allowedFields.map(elem => nameMap(elem._1) -> elem._2.toByte)
+  def createFieldMap(nameMap: Map[String, Int]): Unit = fieldMap = allowedFields.keysIterator.filter(AllClasses.get.exists).
+    map(elem => nameMap(elem) -> allowedFields(elem)).toMap
 
   def defaultValue:A
 
@@ -66,11 +67,11 @@ trait IntSidePanelComponent extends SidePanelComponent[Int] {
 trait ActiveInputField {
   val elem: Input =input(`type`:="Text").render
   elem.onchange= (e:Event)=>{
-    println("Changed "+elem.value)
+    //println("Changed "+elem.value)
     fieldChanged(elem.value)
   }
   def text_=(text:String): Unit ={
-    println("set Text:"+text)
+    //println("set Text:"+text)
     elem.value=text
   }
   def text:String=elem.value
@@ -102,6 +103,26 @@ abstract class SidePanelComboBox[A](items: Seq[A],editor:FieldEditor,val allowed
   }
 }
 
+
+class SiedPanelStringInputField(val allowedFields:Map[String,Byte],editor:FieldEditor) extends ActiveInputField with SidePanelComponent[String] {
+  def filter(text:String)=true
+
+  override def fieldChanged(newVal: String): Unit = if (filter(newVal)) editor.storeValue(newVal,this)
+
+  override def defaultValue: String = ""
+
+  override def getConstant(value: String): Constant = new StringConstant(value)
+
+  override def valueFromConstant(c: Constant): String = c.toString
+
+  override def setValue(newValue: Option[String]): Unit = {
+    super.setValue(newValue)
+    newValue match {
+      case Some(sVal)=> text=sVal
+      case _ => text=defaultValue
+    }
+  }
+}
 
 
 

@@ -22,6 +22,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
   var oldData:Seq[InstanceData]=Seq.empty
   var lastFocusedTable:Option[TableModel]=None
   var ref:Reference=EMPTY_REFERENCE
+  var currentModule:Option[PluginModule]=None
 
   override def onLoad(data: Iterator[InstanceData]): Unit = {
     oldData=data.toIndexedSeq
@@ -50,7 +51,9 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
       println("load Module "+module)
       contentNode.appendChild(module.content)
       module.load(ref)
+      currentModule=Some(module)
     } else {
+      currentModule=None
       val prFields = AllClasses.get.getClassByID(topRef.typ).propFields
 
       def loop(prIx: Int): Unit = if (prIx < prFields.size) {
@@ -70,7 +73,7 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
               clearButtons()
               for (cr <- createClasses)
                 rowDiv.appendChild(button(`class` := "prfield-createbutton", onclick := { () => {
-                  WebSocketConnector.createInstance(cr.childClassID, Array(new OwnerReference(prIx, topRef)), _ => {})
+                  WebSocketConnector.createInstance(cr.childClassID, Array(new OwnerReference(prIx, topRef)))
                   clearButtons()
                 }
                 })(cr.childName).render)
@@ -110,10 +113,11 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
 
   override def onChildAdded(data: InstanceData): Unit = {}
 
-  protected def clearPath(): Unit = {
+  def clearPath(): Unit = {
     while(parentNode.hasChildNodes()) parentNode.removeChild(parentNode.firstChild)
     while(contentNode.hasChildNodes()) contentNode.removeChild(contentNode.firstChild)
     for(pr<-propList) pr.shutDown()
+    for(mod<-currentModule)mod.shutDown()
     propList.clear()
   }
 
@@ -151,4 +155,6 @@ class PathModel(parentNode:HTMLElement,contentNode:HTMLElement) extends InstSubs
     case Some(atable)=> atable.requestFocus()
     case _=>
   }
+
+  def updateResize(): Unit =for(m<-currentModule) m.updateResize()
 }

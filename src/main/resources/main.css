@@ -328,6 +328,28 @@ flex-direction:column;
   padding:0;
 }
 
+.building-canvas{
+   flex-grow:1;
+   image-rendering: optimize-contrast;
+   overflow:hidden;
+   margin:0;
+   padding:0;
+   border: 1px solid black;
+}
+
+.building-header{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+}
+
+.building-topline{
+ display:flex;
+ flex-direction:row;
+ align-items: center;
+}
+
 /*.crosshairdivs{
 	position: absolute;
 	z-index: 10000;

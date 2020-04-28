@@ -17,7 +17,7 @@ class TableContent extends TileContent {
   def load():Unit={}
   def save():Unit={}
   val pathDiv: Div =div(`class`:="headerdiv").render
-  val contentDiv: Div = div(overflow := "auto").render
+  val contentDiv: Div = div(overflow := "auto",height:="100%").render
   val content:HTMLElement =div(`class`:="table-tile",tabindex:="-1")( pathDiv,contentDiv).render
   val pathMod: PathModel =  new PathModel(pathDiv, contentDiv)
 
@@ -44,5 +44,13 @@ class TableContent extends TileContent {
     } else WebSocketConnector.root
   }
 
-  def close():Unit = {WebSocketConnector.removeSubscription(pathMod.subsID)}
+  override def updateResize(): Unit = {
+    pathMod.updateResize()
+  }
+
+
+  def close():Unit = {
+    WebSocketConnector.removeSubscription(pathMod.subsID)
+    pathMod.clearPath()
+  }
 }

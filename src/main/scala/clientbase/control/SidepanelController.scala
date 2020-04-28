@@ -1,7 +1,7 @@
 package clientbase.control
 
 import clientbase.connection.WebSocketConnector
-import clientbase.viewer2d.{ColorFieldEditor, LineFormatEditor}
+import clientbase.viewer2d.{ColorFieldEditor, LineFormatEditor, NameFieldEditor}
 import definition.data.Referencable
 import definition.typ.{AbstractObjectClass, ActionTrait, SelectGroup}
 import org.scalajs.dom.html.{Button, Input, Label, Paragraph, Span}
@@ -44,7 +44,7 @@ object SidepanelController {
   val panelCompTag="panel-comp"
   val fieldEditorsDiv:Div=div(`class`:="fieldeditor-panel").render
   val fieldEditorMap: Predef.Map[String, FieldEditor] = Map("client.graphicsView.ColorFieldEditor"->new ColorFieldEditor,
-    "client.graphicsView.LineStyleEditor"-> new LineFormatEditor)
+    "client.graphicsView.LineStyleEditor"-> new LineFormatEditor,"client.dialog.NameFieldEditor"->new NameFieldEditor)
 
 
   def setup(nsidePanelRoot: HTMLElement, ncontentRoot: HTMLElement): Unit = {
@@ -99,7 +99,7 @@ object SidepanelController {
   }}
 
   def setSelection(text: String, actions: mutable.LinkedHashMap[String, ActionTrait]): Unit = {
-    println("set selection "+text+" actions:"+actions.size)
+    //println("set selection "+text+" actions:"+actions.size)
 
     removeAnswerPanel()
     if (open && !sidePanelRoot.contains(actionArea)) sidePanelRoot.appendChild(actionArea)
@@ -110,7 +110,7 @@ object SidepanelController {
       actionArea.removeChild(actionArea.lastChild)
 
     for(action<-actions.values.toIndexedSeq.sortBy(_.buttonID)) {
-      val b=button(`class`:="actionbutton")(action.name)(onclick:={()=>{println("action "+action.name);DialogManager.startAction(action)}}).render
+      val b=button(`class`:="actionbutton")(action.name)(onclick:={()=>{/*println("action "+action.name);*/DialogManager.startAction(action)}}).render
       actionArea.appendChild(b)
     }
     actionArea.appendChild(messageLabel)
@@ -121,7 +121,7 @@ object SidepanelController {
   def addMessage(st: String): Unit = messageLabel.innerHTML = messageLabel.innerHTML + "<br>" + st
 
   def showAnswerPanel(): Unit = {
-    println("showAnswerPanel")
+    //println("showAnswerPanel")
     doOpen()
     hideFieldEditors()
     if (sidePanelRoot.contains(actionArea)) sidePanelRoot.removeChild(actionArea)

@@ -363,7 +363,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     currentBounds = canvHolder.getBoundingClientRect()
     val w = canvHolder.clientWidth - 1
     val h = canvHolder.clientHeight - 1
-    //println("resize "+w+" "+h)
+
     hudCanvas.width=w
     hudCanvas.height=h
 

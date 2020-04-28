@@ -1,5 +1,6 @@
 package clientbase.viewer2d
 
+import building.PartArea
 import clientbase.control.{FieldEditor, SidePanelComponent, SidepanelController}
 import definition.expression.{Constant, IntConstant}
 import org.scalajs.dom.html.{Div, Input}
@@ -8,12 +9,12 @@ import scalatags.JsDom.all._
 
 class ColorFieldEditor extends FieldEditor {
 
-
-  val inputField: SidePanelColorInputField =new SidePanelColorInputField(Map(("Plane",3),("Teilvolumen",1),("RoomBox",0),("PolyElem",0),("LineElem",0),("ArcElem",0),
+  val inputField: SidePanelColorInputField =new SidePanelColorInputField(Map(("Plane",3),("PartArea",3),("PolyElem",0),("LineElem",0),("ArcElem",0),
     ("EllipseElem", 0), ("TextElem", 0), ("DimLineElem", 0), ("AreaPolygon", 1), ("BitmapElem", 0), ("PolyLineElem", 0), ("MeasurePolyLine", 1), ("Wohnfläche", 1)),this) {
 
     addSearchLookup({
       case c:GraphElem => c.color
+      case p:PartArea=> p.aufbau
     })
   }
 
@@ -54,7 +55,8 @@ class SidePanelColorInputField(val allowedFields:Map[String,Byte],editor:FieldEd
     }
   }
 
-  def fieldChanged(newVal: String): Unit =
+  def fieldChanged(newVal: String): Unit = {
     editor.storeValue(Integer.valueOf(newVal.drop(1),16).toInt,this)
+  }
 
 }

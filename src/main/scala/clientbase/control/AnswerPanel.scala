@@ -31,7 +31,7 @@ abstract class AnswerPanel {
 
 class StringAnswerPanel extends AnswerPanel {
   def typeString="text"
-  val inputField=ActiveEditField(typeString,"",text=> parseText(text) match {
+  val inputField=ActiveEditField(typeString,"answer-edit",text=> parseText(text) match {
     case Some(const)=> DialogManager.answerGiven(answerDefinition,const)
     case None=> println("cant parse "+text)
   })

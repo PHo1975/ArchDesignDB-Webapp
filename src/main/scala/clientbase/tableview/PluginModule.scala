@@ -1,5 +1,6 @@
 package clientbase.tableview
 
+import clientbase.building.BuildingModule
 import clientbase.viewer2d.BlockTestModule
 import definition.data.Reference
 import org.scalajs.dom.html.Div
@@ -15,18 +16,19 @@ trait PluginModule {
   def fullSize:Boolean
   def content:HTMLElement
   def shutDown():Unit
+  def updateResize():Unit
   def load(ref:Reference):Unit
 }
 
 object PluginModules {
   protected var templateMap: Map[Int, Class[_ <: PluginModule]] =Map[Int, Class[_ <:PluginModule]](
-    700->classOf[BlockTestModule])
+    700->classOf[BlockTestModule],310->classOf[BuildingModule])
 
-  protected val loadedPluginsMap: collection.mutable.Map[Int, PluginModule] =collection.mutable.HashMap[Int,PluginModule]()
+  //protected val loadedPluginsMap: collection.mutable.Map[Int, PluginModule] =collection.mutable.HashMap[Int,PluginModule]()
 
   def contains(typ:Int): Boolean =templateMap.contains(typ)
 
-  def apply(typ:Int): PluginModule = loadedPluginsMap.getOrElseUpdate(typ,instantiate(templateMap(typ))())
+  def apply(typ:Int): PluginModule = /*loadedPluginsMap.getOrElseUpdate(typ,*/instantiate(templateMap(typ))()//)
 
   def instantiate[A](cls: Class[A])(args: Any*): A = {
     val gb=js.Dynamic.global

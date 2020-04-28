@@ -2,7 +2,7 @@ package clientbase.tableview
 
 import clientbase.connection.InstSubscriber
 import clientbase.control.FocusOwner
-import definition.data.{InstanceData, Reference}
+import definition.data.{EMPTY_OWNERREF, InstanceData, OwnerReference, Reference}
 import definition.typ.AllClasses
 import org.scalajs.dom.raw.Node
 import util.Log
@@ -15,6 +15,7 @@ import util.Log
 class PropertyModel(val topRef:Reference,val propField:Int,parentNode:Node,pathSubsID:Int,callBack:()=>Unit,
                     singleField:Boolean,allowedClass:Int,pathModel:PathModel) extends InstSubscriber {
 
+  val owner:OwnerReference=OwnerReference(propField.toByte,topRef)
 
   val tableModelList= new collection.mutable.LinkedHashMap[Int,TableModel]()
 

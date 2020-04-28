@@ -21,6 +21,7 @@ import scala.util.control.NonFatal
  */
 class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,propertyModel:PropertyModel,singleField:Boolean,showClassLabel:Boolean) extends FocusOwner {
   import TableModel._
+  implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
   var dragIx:Int= -1
   protected val data=new ArrayBuffer[InstanceData]()
@@ -30,7 +31,7 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
   protected val myTable: Table = table(createHeader).render
 
   protected var selection:TreeSet[Int]=TreeSet.empty
-  val selectionGroup=new SelectGroup[Reference](EMPTY_OWNERREF,Seq.empty)
+  val selectionGroup=new SelectGroup[Reference](propertyModel.owner,Seq.empty)
 
   val selectionGroupList=List(selectionGroup)
   var createdRow:Option[Int]=None
@@ -306,7 +307,7 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
     val fieldIx = tableSettings(focusedCol).ix
     var instRef:Option[Reference]=None
     val text=if(focusedRow>data.size-1) "" else {
-      val inst = data(focusedRow)
+      val inst: InstanceData = data(focusedRow)
       instRef=Some(inst.ref)
       inst.fieldData(fieldIx) match {
         case StringConstant(st) => st
@@ -315,11 +316,9 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
     }
     val parent=myTable.childNodes.item(focusedRow+1).childNodes.item(focusedCol+1)
     SelectionController.cellEditor.startEdit(text, parent, (newText, _) => {
-      if(instRef.isEmpty) {
-        WebSocketConnector.createInstance(typ,Array(new OwnerReference(propertyModel.propField,propertyModel.topRef)),const=>{
+      if(instRef.isEmpty)
+        for(const<-WebSocketConnector.createInstance(typ,Array(new OwnerReference(propertyModel.propField,propertyModel.topRef))))
           writeField(new Reference(typ,const.toInt),fieldIx,newText)
-        })
-      }
       else for(ref<-instRef) writeField(ref,fieldIx,newText)
     })
   }
@@ -371,7 +370,7 @@ class TableModel(val index:Int,val typ:Int,parentNode:Node,pathSubsID:Int,proper
 
   protected def notifySelection():Unit={
     selectionGroup.children= (for(s<-selection.iterator; if s<data.size) yield data(s).ref).toSeq
-    println("notify:"+selection.mkString(",")+"  "+ selectionGroup.children.map(_.ref).mkString(","))
+    //println("notify indices:"+selection.mkString(",")+" children:"+ selectionGroup.children.map(_.ref).mkString(","))
     SelectionController.select(selectionGroupList)
     propertyModel.focusGained(Some(this))
   }

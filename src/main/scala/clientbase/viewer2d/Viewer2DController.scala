@@ -53,7 +53,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
   val layerList=new LayerList(this)
   val scaleModel=new ScaleModel
   val canvasHolder: Div = div(`class` := "viewer2dcanvas",tabindex:="0")(/*horCross, vertCross,selectRectangle*/).render
-  val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
+  //val geometryBuffer: ArrayBuffer[Object3D] =collection.mutable.ArrayBuffer[Object3D]()
   var customDragger:Option[(VectorConstant,CanvasRenderingContext2D)=>Unit]=None
   var lastSelectedPoint:VectorConstant=NULLVECTOR
   var pointClickListener :Option[PointClickListener]=None

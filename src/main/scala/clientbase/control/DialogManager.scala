@@ -48,6 +48,7 @@ object DialogManager {
           actionGroups=SelectionController.currentSelection
           loadQuestion(question)
         case None => for(sg<-SelectionController.currentSelection) {
+          //println("Execute Action without questions parent:"+sg.parent+" children:"+sg.children+" name:"+newAction.name)
           WebSocketConnector.executeAction(sg.parent,sg.children,newAction.name,Seq.empty)
           reset()
         }
@@ -56,7 +57,7 @@ object DialogManager {
   }
 
   def startCreateAction(action:ActionTrait,ncreateType:Int,npropField:Byte):Unit ={
-    println("StartCreateAction "+action)
+    //println("StartCreateAction "+action)
     if(dialogIsActive&& ! hasRebound)reset()
     if(hasRebound) hasRebound=false
     action.question match {
@@ -200,7 +201,7 @@ object DialogManager {
             lc.createActionSubmitted(if(createdNewElements==0) 1 else createdNewElements)
             val formatValues: Seq[(Int, Constant)] =SelectionController.getCreationFormatValues(ctype)
             for(cAction<-currentAction;owner<-lc.getOwnerRef) {
-              println("Execute "+owner.ref+" pr:"+propField+" ctype:"+ctype+" Action:"+cAction.name+" Answers:"+answerList+" format:"+formatValues)
+              //println("Execute "+owner.ref+" pr:"+propField+" ctype:"+ctype+" Action:"+cAction.name+" Answers:"+answerList+" format:"+formatValues)
               WebSocketConnector.executeCreateAction(owner.ref,propField,ctype,cAction.name,answerList,formatValues)
             }
 

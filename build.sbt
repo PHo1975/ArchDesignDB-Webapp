@@ -19,7 +19,7 @@ libraryDependencies +=  "dbdef" %%% "dbdef" % "0.9-SNAPSHOT"
 libraryDependencies += "jsbase" %%% "jsbase" % "0.1-SNAPSHOT"
 libraryDependencies += "org.scala-lang.modules" %%% "scala-parser-combinators" % "1.1.2"
 libraryDependencies += "com.lihaoyi" %%% "scalatags" % "0.8.2"
-libraryDependencies += "threejs-facade" %%% "threejs-facade" % "0.0.77-0.1.9"
+libraryDependencies += "threejs-facade" %%% "threejs-facade" % "0.1-SNAPSHOT"
 //libraryDependencies += "io.github.cquiroz" %%% "scala-java-locales" % "0.5.3-cldr31"
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 addCommandAlias("f", "fastOptJS")

@@ -52,12 +52,13 @@ object SelectionController {
     lazy val supportsTouch: Boolean = org.scalajs.dom.window.hasOwnProperty("ontouchstart")
 
   def setFocusedElement(owner: FocusOwner): Unit = if (focusedElement.isEmpty || focusedElement.get != owner) {
-    println("setFocusedElement "+owner+" focusedElem:"+focusedElement)
+    //println("setFocusedElement "+owner+" focusedElem:"+focusedElement)
     for(f<-focusedElement)f.blur()
     focusedElement=Some(owner)
   }
 
   def select(selection: Iterable[SelectGroup[_ <: Referencable]]): Unit = {
+    //println("Select "+selection.mkString("|"))
     cellEditor.finishEdit(0, focusTable = false)
     resetOldSelection()
     currentSelection.clear
@@ -78,7 +79,7 @@ object SelectionController {
 
 
   def addSelection(selection: Iterable[SelectGroup[_ <: Referencable]],toggle:Boolean): Unit = {
-    println("Add Selection "+selection)
+    //println("Add Selection "+selection)
     cellEditor.finishEdit(0, focusTable = false)
 
     for(ngroup<-selection;if ngroup.children.nonEmpty) {
@@ -198,7 +199,7 @@ object SelectionController {
 
   def containerFocused(container:FocusContainer, propField:Int):Boolean =
     if( lastContainer.isEmpty ||  !(container==lastContainer.get&&container.getOwnerRef==lastOwnerRef&&propField==lastPropField)) {
-      println("ContainerFocus "+container.getOwnerRef+" propField"+propField)
+      //println("ContainerFocus "+container.getOwnerRef+" propField"+propField)
 
       if(lastContainer.isDefined&& container!=lastContainer.get)lastContainer.get.lostSelection()
       if (DialogManager.dialogIsActive) DialogManager.reset()

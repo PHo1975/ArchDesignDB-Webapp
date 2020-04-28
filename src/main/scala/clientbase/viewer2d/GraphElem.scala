@@ -8,7 +8,7 @@ import util.Log
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.scalajs.js
-import scala.scalajs.js.typedarray.Float32Array
+import scala.scalajs.js.typedarray.{Float32Array, Float64Array}
 
 /**
   * Created by Peter Holzer on 11.02.2017.
@@ -445,7 +445,7 @@ object GraphElem {
           current += 1
         }
         geom.setIndex(indices)
-        geom.addAttribute("position", new BufferAttribute(apoints, 3))
+        geom.addAttribute("position", new Float32Attribute(apoints, 3))
         geom.computeFaceNormals()
         geom.computeBoundingSphere()
         geom
