@@ -1,10 +1,15 @@
 package clientbase.viewer2d
 
+import java.awt.BasicStroke
+
+import clientbase.building.BuildingDataModel
 import clientbase.connection.{WebSocketConnector, WebSystemSettings}
-import definition.data.{InstanceData, LineStyle, Reference}
+import definition.data._
 import definition.typ.SystemSettings
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{Future, Promise}
 import scala.util.matching.Regex
 
 
@@ -131,22 +136,97 @@ object DimLineStyleHandler extends AbstractSettingHandler {
   }
 
 
-object LineStyleHandler extends AbstractSettingHandler {
-  //println("Start LineStyleHandler")
-  val undefinedStyle=new LineStyle(-1," - ",Array())
-  //val hoverStroke=new BasicStroke(3.5f)
-  val name="LineStyles"
-  var stylesList:Seq[LineStyle]=Seq.empty
-  //r standardStrokes:Seq[BasicStroke]=Seq.empty
-  var folderRef:Option[Reference]=None
-  init()
-  def styles: Seq[LineStyle] =stylesList
+object Handlers {
 
-  def loadSettings(ref:Reference): Unit = this.synchronized{//Swing.onEDT {
-    folderRef=Some(ref)
-    var i:Int= -1
-    WebSocketConnector.loadChildren(ref,1,data=> {
-      stylesList=data.map(ls=> {i+=1;new LineStyle(i,ls)})
-    })
+  implicit object LineStyleHandler extends AbstractSettingHandler with AbstractLineStyleHandler {
+    //println("Start LineStyleHandler")
+    val undefinedStyle = new LineStyle(-1, " - ", Array())
+    //val hoverStroke=new BasicStroke(3.5f)
+    val name = "LineStyles"
+    var stylesList: Seq[LineStyle] = Seq.empty
+    //r standardStrokes:Seq[BasicStroke]=Seq.empty
+    //var folderRef: Option[Reference] = None
+
+
+    def styles: Seq[LineStyle] = stylesList
+
+    def loadSettings(ref: Reference): Unit = this.synchronized { //Swing.onEDT {
+      //folderRef = Some(ref)
+      var i: Int = -1
+      WebSocketConnector.loadChildren(ref, 1, data => {
+        stylesList = data.map(ls => {
+          i += 1
+          new LineStyle(i, ls)
+        })
+      })
+    }
+
+    override def createStroke(scale: Double, width: Float, styleIx: Int): BasicStroke = null
+  }
+
+
+  implicit object MaterialHandler extends  AbstractSettingHandler with AbstractMaterialHandler {
+    val undefinedMaterial=new Material(0," - ",0,0)
+    var materialMap=new collection.mutable.LinkedHashMap[Int,Material]()
+
+    override def name: String = "Material"
+
+    override def loadSettings(ref: Reference): Unit = {
+      WebSocketConnector.loadChildren(ref,1,data=> for(d<-data)
+        materialMap(d.ref.instance)=new Material(d)
+      )
+    }
+
+    override def getMaterial(inst: Int): Option[Material] = materialMap.get(inst)
+  }
+
+  class CompositionStub(data:InstanceData) {
+    protected var promise:Promise[Composition]=_
+    protected var future:Future[Composition]=_
+    def ref: Reference =data.ref
+    def name: String =data.fieldValue(1).toString
+
+    def getValue:Future[Composition]=if (future==null){
+      promise=Promise[Composition]()
+      WebSocketConnector.loadChildren(data.ref,0,layerData=>{
+        promise.success(new Composition(data,layerData.map(new ShellLayer(_))))
+      })
+      future=promise.future
+      future
+    }else future
+
+    override def toString: String = name
+  }
+
+  object undefinedShellLayer extends ShellLayer(MaterialHandler.undefinedMaterial, 0, 0, 0, 0, LineStyleHandler.undefinedStyle, 0,0,BuildingDataModel.greyColor)
+
+  object UndefinedComposition extends Composition(0, " - ", 0, Seq.empty)
+
+  object CompositionHandler extends AbstractSettingHandler {
+
+    val undefinedCompositionStub: CompositionStub =new CompositionStub(null ){
+      override def name="nicht definiert"
+    }
+    protected val compMap: mutable.LinkedHashMap[Int, CompositionStub] =collection.mutable.LinkedHashMap[Int,CompositionStub]()
+
+    override def name: String = "Composition"
+
+    override def loadSettings(ref: Reference): Unit = {
+      WebSocketConnector.loadChildren(ref,1,data=> for(d<-data )
+        compMap(d.ref.instance)=new CompositionStub(d))
+    }
+
+    def compositionExists(inst:Int): Boolean =compMap.contains(inst)
+
+    def getStub(inst:Int): CompositionStub =compMap.getOrElse(inst, undefinedCompositionStub)
+
+    def getComposition(inst:Int):Future[Composition]={
+      if(compositionExists(inst)) compMap(inst).getValue
+      else Future.failed(new IllegalArgumentException("Wrong composition instance:"+inst))
+    }
+
+    def compositionIDs: Iterable[Int] =compMap.keys
+
+    def compositionNames: Iterator[CompositionStub] =compMap.valuesIterator
   }
 }

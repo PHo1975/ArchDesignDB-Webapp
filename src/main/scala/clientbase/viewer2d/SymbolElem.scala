@@ -2,13 +2,13 @@ package clientbase.viewer2d
 
 import definition.data.Reference
 import definition.expression._
-import org.denigma.threejs.{Camera, Object3D}
+import org.denigma.threejs.{Camera, Mesh}
 
 import scala.scalajs.js
 
 class SymbolElem(nref:Reference,ncolor:Int,stampRef:Reference,val angle:Double,val scale:Double,pos:VectorConstant,paramString:String)
   extends GraphElem(nref,ncolor) {
-  protected val _geometry=new js.Array[Object3D]
+  protected val _geometry=new js.Array[Mesh]
   val name: String ="S"+nref.instance
   var elems:Seq[GraphElem]=Seq.empty
   var _elemContainer:ElemContainer=_
@@ -30,7 +30,7 @@ class SymbolElem(nref:Reference,ncolor:Int,stampRef:Reference,val angle:Double,v
       //println("createGeo "+nref+" angle:"+angle+" el:"+elems.size+" pos:"+pos)
       for (el <- elems) {
         el.createGeometry(container)
-        for (obj: Object3D <- el.geometry) {
+        for (obj <- el.geometry) {
           //obj.position.x = obj.position.x + pos.x
           //obj.position.y = obj.position.y + pos.y
           obj.name=name
@@ -84,7 +84,7 @@ class SymbolElem(nref:Reference,ncolor:Int,stampRef:Reference,val angle:Double,v
     BRect(x1,y1,x2,y2)
   }
 
-  override def geometry: js.Array[Object3D] = _geometry
+  override def geometry: js.Array[Mesh] = _geometry
 
   override def getFormatFieldValue(fieldNr: Int): Constant = fieldNr match {
     case 0=> IntConstant(color)

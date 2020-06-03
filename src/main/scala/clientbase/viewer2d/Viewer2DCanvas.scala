@@ -208,7 +208,7 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
     e.targetTouches.length match {
       case 1 =>
         oldTouches.clear
-        val t1 = e.targetTouches.item(0)
+        val t1: Touch = e.targetTouches.item(0)
         oldTouches(t1.identifier) = t1
         touchX1 = e.targetTouches.item(0).clientX
         touchY1 = e.targetTouches.item(0).clientY
@@ -349,12 +349,12 @@ class Viewer2DCanvas(controller: Viewer2DController, canvHolder: Div, scaleModel
 
   def getDir(d: Double): Int = if (Math.abs(d) <= tresh) 0 else if (d < 0d) -1 else 1
 
-  def addGeometry(obj: Object3D): Unit = {
+  def addGeometry(obj: Mesh): Unit = {
     if (obj != null)
       scene.add(obj)
   }
 
-  def removeGeometry(obj: Object3D): Unit = {
+  def removeGeometry(obj: Mesh): Unit = {
     if (obj != null)
       scene.remove(obj)
   }

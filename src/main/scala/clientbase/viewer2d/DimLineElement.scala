@@ -2,7 +2,7 @@ package clientbase.viewer2d
 
 import definition.data.{DimensionPoint, Reference}
 import definition.expression._
-import org.denigma.threejs.{Camera, Mesh, Object3D, ShapeGeometry}
+import org.denigma.threejs.{Camera, Mesh, ShapeGeometry}
 
 import scala.scalajs.js
 
@@ -19,7 +19,7 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
   lazy val lastInterPoint: VectorConstant = if (intersectionLines.isEmpty) mainRefPoint else intersectionLines.last._2
   lazy val styleInfo: DimLineStyle = DimLineStyleHandler.getStyle(style)
   lazy val hitPoints: IndexedSeq[VectorConstant] = intersectionLines.map(_._2)
-  protected val _geometry= new js.Array[Object3D]
+  protected val _geometry= new js.Array[Mesh]
 
   lazy val bounds: BRect = {
     var minx = Double.MaxValue
@@ -153,7 +153,7 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
       })
   }
 
-  override def geometry: js.Array[Object3D] = _geometry
+  override def geometry: js.Array[Mesh] = _geometry
 
   override def getFormatFieldValue(fieldNr: Int): Constant = EMPTY_EX
 

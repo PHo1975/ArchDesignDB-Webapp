@@ -8,7 +8,7 @@ import util.Log
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.scalajs.js
-import scala.scalajs.js.typedarray.{Float32Array, Float64Array}
+import scala.scalajs.js.typedarray.Float32Array
 
 /**
   * Created by Peter Holzer on 11.02.2017.
@@ -41,7 +41,7 @@ trait Formatable extends Referencable {
 
 trait ElemContainer {
   def scaleRatio:Double
-  def addGeometry(geom:Object3D):Unit
+  def addGeometry(geom:Mesh):Unit
   def dataUpdated():Unit
 }
 
@@ -58,7 +58,7 @@ abstract class GraphElem(override val ref: Reference, val color: Int) extends Fo
   def calcScreenBounds(container: ElemContainer, camera:Camera, res:BoundsContainer): Unit = res.setEmpty()
 
   def createGeometry(container:ElemContainer):Unit
-  def geometry:js.Array[Object3D]
+  def geometry:js.Array[Mesh]
 
   def showSelection(): Unit = for(obj<-geometry) obj match {
     case m: Mesh => m.material = GraphElem.selectMaterial
@@ -80,12 +80,12 @@ class GraphElemStub(override val ref:Reference) extends GraphElem(ref,0)  {
 
   def createGeometry(container:ElemContainer): Unit = {}
   //def hideSelection(): Unit = {}
-  def geometry:js.Array[Object3D]=null
+  def geometry:js.Array[Mesh]=null
 }
 
 abstract class LinearElement(nref:Reference,ncolor:Int,val lineWidth:Int,val lineStyle:Int) extends GraphElem(nref,ncolor) {
-  protected val _geometry= new js.Array[Object3D]
-  def geometry: js.Array[Object3D] =_geometry
+  protected val _geometry= new js.Array[Mesh]
+  def geometry: js.Array[Mesh] =_geometry
 
   override def getFormatFieldValue(fieldNr:Int):Constant= {
     fieldNr match {
@@ -298,7 +298,7 @@ case class EllipseElement(nref: Reference, ncolor: Int, nlineWidth: Int, nlineSt
 case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorConstant,fontName:String,fheight:Double,
                        widthRatio:Double,style:Int,
                        textAngle:Double,obligeAngle:Double,lineSpace:Double) extends GraphElem(nref,ncolor) {
-  protected val _geometry=new js.Array[Object3D]
+  protected val _geometry=new js.Array[Mesh]
   val meshName: String ="T"+ref.instance
   protected var textWidth: Double = -1d
   private var cornerPoints:Array[VectorConstant]=_
@@ -320,7 +320,7 @@ case class TextElement(nref:Reference,ncolor:Int,text:String,position:VectorCons
 
   def isStyle(pattern: Int): Boolean = (style & pattern) > 0
 
-  override def geometry:js.Array[Object3D]=_geometry
+  override def geometry:js.Array[Mesh]=_geometry
 
   protected def calcBounds(container:ElemContainer):Bounds= {
     val height=fheight/1000d*container.scaleRatio

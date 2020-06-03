@@ -13,6 +13,7 @@ class AnswerController {
 
   lazy val eitherLab: Span = span(`class` := "orlabel")("Entweder:").render
   lazy val pointPanel=new PointAnswerPanel
+  lazy val objectPanel=new ObjectAnswerPanel
 
   cancelButton.onclick= _ =>{
     DialogManager.reset()
@@ -26,6 +27,7 @@ class AnswerController {
     question match  {
       case d: DialogQuestion =>
         questionLabel.innerHTML=d.name
+        println("DialogQuestion "+d.possibleAnswers.mkString("\n "))
         if(d.possibleAnswers.size>1) panel.appendChild(eitherLab)
         var counter=0
         for(answerDef<-d.possibleAnswers) {
@@ -34,6 +36,7 @@ class AnswerController {
             case DataType.IntTyp=> new IntAnswerPanel
             case DataType.DoubleTyp=> new DoubleAnswerPanel
             case DataType.VectorTyp=> pointPanel
+            case DataType.ObjectRefTyp=>objectPanel
             case o => throw new IllegalArgumentException("unbekannter Typ "+ o)
           }
           panel.appendChild(apanel.loadAnswerParam(answerDef))

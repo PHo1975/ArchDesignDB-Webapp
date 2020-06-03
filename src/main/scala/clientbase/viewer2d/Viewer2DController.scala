@@ -5,14 +5,13 @@ import clientbase.tilelayout.TileContent
 import definition.data.{Referencable, Reference}
 import definition.expression.{NULLVECTOR, VectorConstant}
 import definition.typ.SelectGroup
-import org.denigma.threejs.{Camera, Object3D, Vector3}
+import org.denigma.threejs.{Camera, Mesh, Vector3}
 import org.scalajs.dom.CanvasRenderingContext2D
 import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.{ClientRect, HTMLElement}
 import scalatags.JsDom.all._
 import util.Log
 
-import scala.collection.mutable.ArrayBuffer
 import scala.scalajs.js
 import scala.util.control.NonFatal
 
@@ -234,7 +233,7 @@ class Viewer2DController extends AbstractViewerController with TileContent with 
   }
 
 
-  override def addGeometry(gr: Object3D): Unit = try {
+  override def addGeometry(gr: Mesh): Unit = try {
     if (gr != null) {
       canvasHandler.addGeometry(gr)
     }

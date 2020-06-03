@@ -3,12 +3,9 @@ package clientbase.tableview
 import clientbase.building.BuildingModule
 import clientbase.viewer2d.BlockTestModule
 import definition.data.Reference
-import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.HTMLElement
-import scalatags.JsDom.all._
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 
 trait PluginModule {

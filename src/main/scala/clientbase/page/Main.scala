@@ -3,23 +3,22 @@ package clientbase.page
 import clientbase.connection.WebSocketConnector
 import clientbase.control.SidepanelController
 import clientbase.tilelayout.{ContentFactory, Tile}
-import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, LineStyleHandler, Viewer2DController}
-import org.scalajs.dom.{document, window}
+import clientbase.viewer2d.Handlers._
+import clientbase.viewer2d.{DimLineStyleHandler, GraphSettingsHandler, Viewer2DController}
 import org.scalajs.dom.raw.HTMLElement
+import org.scalajs.dom.{document, window}
 import util.Log
 
-import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
+import scala.scalajs.js.annotation.JSExportTopLevel
 import scala.util.control.NonFatal
-
-
 /**
  * Created by Peter Holzer on 05.04.2015.
  */
 
 object Main {
 
-  def main(args: Array[String]): Unit = start
-  @JSExportTopLevel("foo") def start()={
+  def main(args: Array[String]): Unit = start()
+  @JSExportTopLevel("foo") def start(): Unit ={
     println("main ready "+window.location.href+"|"+window.location.pathname)
 
     try {
@@ -33,6 +32,8 @@ object Main {
         println("setup")
         DimLineStyleHandler.init()
         LineStyleHandler.init()
+        MaterialHandler.init()
+        CompositionHandler.init()
         println("init")
         document.body.removeChild(statusLine)
         val sidepanelRoot = document.getElementById("sidepanel").asInstanceOf[HTMLElement]

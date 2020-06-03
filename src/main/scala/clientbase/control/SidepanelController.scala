@@ -1,15 +1,15 @@
 package clientbase.control
 
+import clientbase.building.PartAreaFieldEditor
 import clientbase.connection.WebSocketConnector
 import clientbase.viewer2d.{ColorFieldEditor, LineFormatEditor, NameFieldEditor}
 import definition.data.Referencable
 import definition.typ.{AbstractObjectClass, ActionTrait, SelectGroup}
 import org.scalajs.dom.html.{Button, Input, Label, Paragraph, Span}
 //import org.scalajs.dom.html._
+import org.scalajs.dom.html.Div
 import org.scalajs.dom.raw.{HTMLElement, MouseEvent}
 import scalatags.JsDom.all._
-import org.scalajs.dom.html.Div
-
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -44,7 +44,7 @@ object SidepanelController {
   val panelCompTag="panel-comp"
   val fieldEditorsDiv:Div=div(`class`:="fieldeditor-panel").render
   val fieldEditorMap: Predef.Map[String, FieldEditor] = Map("client.graphicsView.ColorFieldEditor"->new ColorFieldEditor,
-    "client.graphicsView.LineStyleEditor"-> new LineFormatEditor,"client.dialog.NameFieldEditor"->new NameFieldEditor)
+    "client.graphicsView.LineStyleEditor"-> new LineFormatEditor,"client.dialog.NameFieldEditor"->new NameFieldEditor,"PartAreaFieldEditor"->new PartAreaFieldEditor)
 
 
   def setup(nsidePanelRoot: HTMLElement, ncontentRoot: HTMLElement): Unit = {

@@ -1,6 +1,7 @@
 package clientbase.viewer2d
 
 import clientbase.control.{FieldEditor, SidePanelComboBox, SidePanelComponent, SidepanelController}
+import clientbase.viewer2d.Handlers._
 import definition.expression.{Constant, IntConstant}
 import org.scalajs.dom.html.Div
 import scalatags.JsDom.all._
@@ -27,7 +28,7 @@ class LineFormatEditor extends FieldEditor{
     (allowedClassNames.map((_,styleFieldNr)):+(("AreaPolygon",3.toByte))).toMap) {
     val defaultValue: Int = LineStyleHandler.undefinedStyle.ix
 
-    def getConstant(value: Int) = IntConstant(value)
+    def getConstant(value: Int): Constant = IntConstant(value)
 
     def valueFromConstant(c: Constant): Int = c.toInt
 

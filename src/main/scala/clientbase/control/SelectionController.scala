@@ -13,6 +13,11 @@ import scala.collection.mutable.ArrayBuffer
  * Created by Peter Holzer on 20.09.2015.
  */
 
+trait ObjectSelector {
+  def askForObjectSelection(constrains: String, listener: ObjectSelectListener): Unit
+  def cancelObjectSelection():Unit
+}
+
 
 object SelectionController {
   val currentSelection:ArrayBuffer[SelectGroup[_ <: Referencable]]=ArrayBuffer.empty
@@ -26,6 +31,8 @@ object SelectionController {
   var createChildDefs:Seq[AbstractCCD]=Seq.empty
 
   val lastFormatableSelection: mutable.HashMap[Int, Formatable] = collection.mutable.HashMap[Int, Formatable]()
+
+  var currentObjectSelector:Option[ObjectSelector]=None
 
   protected def storeLastFormatables():Unit =
     for(group<-currentSelection;el<-group.children)

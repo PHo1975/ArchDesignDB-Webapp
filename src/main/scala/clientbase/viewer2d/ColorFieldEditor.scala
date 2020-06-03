@@ -1,6 +1,7 @@
 package clientbase.viewer2d
 
 import building.PartArea
+import clientbase.building.{DecoratedLine, DecoratedPartArea}
 import clientbase.control.{FieldEditor, SidePanelComponent, SidepanelController}
 import definition.expression.{Constant, IntConstant}
 import org.scalajs.dom.html.{Div, Input}
@@ -14,7 +15,9 @@ class ColorFieldEditor extends FieldEditor {
 
     addSearchLookup({
       case c:GraphElem => c.color
-      case p:PartArea=> p.aufbau
+      case p:PartArea=> println("search PA: aufbau:"+p.aufbau);p.aufbau
+      case dp:DecoratedPartArea=>println("search dPA: aufbau:"+dp.pa.aufbau);dp.pa.aufbau
+      case dl:DecoratedLine=>dl.pa.aufbau
     })
   }
 

@@ -1,10 +1,10 @@
 package clientbase.building
 
-import building.{AbstractBuildingModel, Cell, PartArea,NoCutPlane}
+import building.{Cell, NoCutPlane, PartArea}
 import clientbase.viewer2d.SelectionDecorable
 import definition.data.Reference
-import definition.expression.{Constant, VectorConstant}
-import org.denigma.threejs.{BufferGeometry, Float32BufferAttribute, Line, LineSegments, Mesh}
+import definition.expression.{Constant, PointList, VectorConstant}
+import org.denigma.threejs.{BufferGeometry, Float32BufferAttribute, Line, LineSegments}
 
 import scala.scalajs.js.typedarray.Float32Array
 
@@ -37,8 +37,6 @@ class DecoratedCell(module: BuildingModule, nref:Reference, ndata: Seq[Constant]
         for (wa<-wallPlaneIDs;waArea<-module.dataModel.findPartAreas(wa,ref.instance)) yield
           createLineSegment(waArea.createCornerPoints(NoCutPlane).map(waArea.defPlane.plane.toWorldVector).toSeq)
       )
-
-
   }
 
   override def showSelection(): Unit = {
@@ -52,4 +50,24 @@ class DecoratedCell(module: BuildingModule, nref:Reference, ndata: Seq[Constant]
 
     module.canvas.repaint()
   }
+
+  lazy val floorPoints: PointList ={
+    val defPlane3D=this.bottomPlane.plane
+     PointList(module.dataModel.pointsFromEdges(wallPlaneIDs.iterator.map(
+      p=>defPlane3D.intersectionWith(module.dataModel.getPlane(p).plane))).map(defPlane3D.getAreaCoords).toSeq).conterClockWise
+  }
+
+  def floorAreaValue: Double =floorPoints.getArea
+
+  def floorCenter: VectorConstant =this.bottomPlane.plane.toWorldVector(floorPoints.getMidPoint)
+
+  def ceilingPoints: PointList ={
+    val defPlane3D=this.topPlane.plane
+    PointList(module.dataModel.pointsFromEdges(wallPlaneIDs.iterator.map(
+      p=>defPlane3D.intersectionWith(module.dataModel.getPlane(p).plane))).map(defPlane3D.getAreaCoords).toSeq).conterClockWise
+  }
+
+  def ceilingCenter: VectorConstant =this.topPlane.plane.toWorldVector(ceilingPoints.getMidPoint)
+
+  def centerPoint:VectorConstant= VectorConstant.midPoint(floorCenter,ceilingCenter)
 }

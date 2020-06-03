@@ -4,7 +4,7 @@ import clientbase.connection.WebSocketConnector
 import definition.data.{EMPTY_REFERENCE, InstanceData, Reference}
 import definition.expression._
 import definition.typ.DataType
-import org.denigma.threejs.Object3D
+import org.denigma.threejs.Mesh
 
 import scala.collection.immutable.Map
 import scala.collection.mutable
@@ -19,7 +19,7 @@ object StampPool {
 
   val measureElemContainer: ElemContainer = new ElemContainer{
     def scaleRatio: Double =1d/100d
-    override def addGeometry(geom: Object3D): Unit = {}
+    override def addGeometry(geom: Mesh): Unit = {}
     override def dataUpdated(): Unit = {}
   }
 
