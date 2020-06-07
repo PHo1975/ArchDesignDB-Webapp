@@ -14,6 +14,8 @@ class DecoratedPartArea(module:BuildingModule,val pa:PartArea,val mesh:Mesh) ext
     helper.applyMatrix(mesh.matrix)
     module.canvas.scene.add(helper)
     module.canvas.repaint()
+    val edges=module.viewModel3D.edgeList.filter(_.partAreas.contains(pa.ref.instance))
+    println("Edges for "+pa.ref.instance+"\n "+edges.mkString("\n "))
   }
 
   override def hideSelection(): Unit = {

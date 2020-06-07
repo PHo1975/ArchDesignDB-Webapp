@@ -13,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.math.Ordering.Double.TotalOrdering
 import scala.scalajs.js
 import scala.scalajs.js.typedarray.Float32Array
-
+import org.scalajs.dom.window
 
 
 class Building3DViewModel(module:BuildingModule) extends ElemContainer with AbstractViewModel {
@@ -32,6 +32,7 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
   var maxZ: Double = Float.MinValue.toDouble
 
   protected val geomList: ArrayBuffer[Mesh] = ArrayBuffer[Mesh]()
+  val edgeList=ArrayBuffer[Edge]()
 
   val decoratedPartAreas: mutable.Map[Int, DecoratedPartArea] = collection.mutable.HashMap[Int, DecoratedPartArea]()
   val decoratedPlanes: mutable.HashMap[Int, DecoratedPlane] = collection.mutable.HashMap[Int, DecoratedPlane]()
@@ -121,25 +122,8 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
   }
 
   def createQuadGeometry(points: Seq[VectorConstant], el: PartArea): Unit =
-    if (points.size == 4) {
-      val geom = new MyBufferGeometry()
-      val apoints = new Float32Array(6 * 3)
-      for (i <- 0 to 2) {
-        apoints(i * 3) = points(i).x.toFloat
-        apoints(i * 3 + 1) = points(i).y.toFloat
-        apoints(i * 3 + 2) = points(i).z.toFloat
-      }
-      for (i <- 0 to 2) {
-        apoints(9 + i) = apoints(6 + i)
-        apoints(15 + i) = apoints(i)
-      }
-      apoints(12) = points(3).x.toFloat
-      apoints(13) = points(3).y.toFloat
-      apoints(14) = points(3).z.toFloat
-      geom.addAttribute("position", new Float32BufferAttribute(apoints, 3))
-      geom.computeFaceNormals()
-      addPartAreaMesh(geom, el)
-    } else println("Wrong number of points " + points.size)
+    if (points.size == 4) addPartAreaMesh(BuildingDataModel.createQuadGeometry(points), el)
+     else println("Wrong number of points " + points.size)
 
 
   def addPartAreaMesh(geom: Geometry, el: PartArea): Unit = {
@@ -181,10 +165,12 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
 
 
   def createGeometry(): Unit = {
+    val now=window.performance.now()
     println("Create Geometry "+module.currentCutPlane.name)
     val planeQuats=collection.mutable.HashMap[Plane3D,Matrix4]()
 
-    def buildUpGeometryPlane(pointList:PointList, el:PartArea): Unit = {
+    def buildUpGeometryPlane(pL:PointList, el:PartArea): Unit = {
+      val pointList=pL.removeDoublePoints().removeStraightEdges()
       val defPlane=el.defPlane.plane
       for(point<-pointList.points; wp=defPlane.toWorldVector(point)){ // find minimal points
         if(wp.x<minX) minX=wp.x
@@ -216,8 +202,78 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
     }
     // connection planes
     BuildingDataModel.loopPartAreas(module.currentCutPlane,dm.partAreaSubscriber.map.valuesIterator,buildUpGeometryPlane)
+    val now2=window.performance.now
+    println("Create Geometry "+(now2-now))
+    createEdgeList()
+    val now3=window.performance.now
+    println("Create Edgelist "+(now3-now2))
     showRooms()
     module.canvas3D.repaint()
+    println("GesamtDauer: "+(window.performance.now-now))
+  }
+
+  def createEdgeList():Unit= {
+    edgeList.clear()
+    BuildingDataModel.loopPartAreas(NoCutPlane,dm.partAreaSubscriber.map.valuesIterator,(pointList,partArea)=>if(pointList.points.size>3){
+      val mappedPointList=pointList.removeDoublePoints().removeStraightEdges().points.map(partArea.defPlane.plane.toWorldVector)
+      for(points<-(mappedPointList:+mappedPointList.head).sliding(2)){
+        val (start,end)= if(points(0)<points(1)) (points(0),points(1)) else (points(1),points(0))
+        //println("PA "+partArea.ref.instance+" Start:"+start+" end:"+end)
+        if(!VectorConstant.similar(start,end)) {
+          //def checkRayEdges(start:VectorConstant,end:VectorConstant,level:Int):Unit = if(level<3){
+            var rayEdges=edgeList.filter(_.sameRay(start,end))
+            //println("RayEdges:"+rayEdges.mkString(" | "))
+            if(rayEdges.isEmpty ){
+              val newEdge=Edge(start,end)
+              newEdge.partAreas+=partArea.ref.instance
+              edgeList+=newEdge
+            }
+            else rayEdges.find(_.isSimilar(start,end)) match {
+              case Some(edge)=>edge.partAreas+=partArea.ref.instance
+              case None =>
+                val restSegments=ArrayBuffer[Edge]()
+                val newEdge=Edge(start,end)
+                newEdge.partAreas+=partArea.ref.instance
+                restSegments+=newEdge
+                for(existentRayEdge<-rayEdges){
+                  var ix=0
+                  while(ix<restSegments.size) {
+                    val restSegment=restSegments(ix)
+                    if(restSegment.isSimilar(existentRayEdge.start,existentRayEdge.end))existentRayEdge.partAreas+=partArea.ref.instance
+                    else if(restSegment.intersects(existentRayEdge)){
+                      restSegments-=restSegment
+                      restSegments++=restSegment.intersectionRest(existentRayEdge)
+                      val existentRest=existentRayEdge.intersectionRest(restSegment)
+                      //println("intesects with "+existentRayEdge+" rest:"+restSegment+" existentRest:"+existentRest.mkString("|")+" restSegments:"+restSegments.mkString("|"))
+                      if(existentRest.isEmpty) existentRayEdge.partAreas+=partArea.ref.instance
+                      else {
+                        edgeList-=existentRayEdge
+                        val intersection=existentRayEdge.getIntersection(restSegment)
+                        intersection.partAreas+=partArea.ref.instance
+                        edgeList+=intersection
+                        edgeList++=existentRayEdge.intersectionRest(restSegment)
+                      }
+                    }
+                    ix+=1
+                  }
+                }
+                for (r<-restSegments) {
+                  rayEdges = edgeList.filter(_.sameRay(start, end))
+                  rayEdges.find(_.isSimilar(r.start, r.end)) match {
+                    case Some(edge) => edge.partAreas += partArea.ref.instance
+                    case None => edgeList += r
+                  }
+                }
+            }
+          //} else println("!! level >3  pa:"+partArea.ref.instance+" start:"+start+" end:"+end+" rayEdges:")
+          //checkRayEdges(astart,aend,1)
+        }
+      }
+    })
+    println("Num Edges:"+edgeList.size)
+    val singles=edgeList.filter(_.partAreas.size==1)
+    println("\nSingle edges:"+singles.size+"\n"+singles.map(s=> s.toString+" index:"+edgeList.indexOf(s)+
+      "\nIntersects:" +edgeList.filter(p=>s.intersects(p)).mkString(" |  ")+"  similar:"+edgeList.filter(p=>s.isSimilar(p.start,p.end)).mkString(" | ")+"\n \n").mkString(""))
   }
 
 
@@ -247,7 +303,7 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
             val areaValue = cells.foldLeft(0d)(_ + _.floorAreaValue)
             val biggestCell = cells.maxBy(_.floorAreaValue)(TotalOrdering)
             val center: VectorConstant = biggestCell.floorCenter
-            println("Raum " + room.name + " " + "%.2f".format(areaValue) + " m2 " + biggestCell.ref.instance + " " + center)
+            //println("Raum " + room.name + " " + "%.2f".format(areaValue) + " m2 " + biggestCell.ref.instance + " " + center)
             printText(room.name, center.x, center.y, biggestCell.bottomPlane.plane.pos.z + 0.01d, 3.0)
             printText("%.2f".format(areaValue) + " m2 ", center.x, center.y - 0.3, biggestCell.bottomPlane.plane.pos.z + 0.01d, 2.5)
           }

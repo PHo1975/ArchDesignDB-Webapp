@@ -2,6 +2,7 @@ package clientbase.building
 
 import building._
 import clientbase.connection.WebSocketConnector
+import clientbase.viewer2d.MyBufferGeometry
 import definition.data.{OwnerReference, Reference}
 import definition.expression.{PartArea => _, _}
 import org.denigma.threejs.{LineBasicMaterial, Plane => _, _}
@@ -22,7 +23,7 @@ protected[building] trait PlaneCalcUtil{
 
 
 object BuildingDataModel {
-  var oqacity:Double=0.8
+  var oqacity:Double=0.7
   val u2=new Vector3(1d,0d,0d)
   val v2=new Vector3(0d,1d,0d)
   val greyColor: Int = -6710887
@@ -137,7 +138,7 @@ object BuildingDataModel {
       } else connAreaMap(key)=List(area)
     }
 
-    for (pa: PartArea <- paIterator; if pa.secondCellID!=0) {
+    for (pa: PartArea <- paIterator; if pa.secondCellID!=0) { // inside planes
       val points = pa.createCornerPoints(cutPlane).toSeq
       val area = new Area( Polygon.toPath2d( points))
       storePolygon(pa.defPlaneID, pa.firstCellID, area)
@@ -173,6 +174,27 @@ object BuildingDataModel {
     mesh.computeLineDistances()
     mesh
   }
+
+  def createQuadGeometry(points: Seq[VectorConstant]): MyBufferGeometry =
+    if (points.size == 4) {
+      val geom = new MyBufferGeometry()
+      val apoints = new Float32Array(6 * 3)
+      for (i <- 0 to 2) {
+        apoints(i * 3) = points(i).x.toFloat
+        apoints(i * 3 + 1) = points(i).y.toFloat
+        apoints(i * 3 + 2) = points(i).z.toFloat
+      }
+      for (i <- 0 to 2) {
+        apoints(9 + i) = apoints(6 + i)
+        apoints(15 + i) = apoints(i)
+      }
+      apoints(12) = points(3).x.toFloat
+      apoints(13) = points(3).y.toFloat
+      apoints(14) = points(3).z.toFloat
+      geom.addAttribute("position", new Float32BufferAttribute(apoints, 3))
+      geom.computeFaceNormals()
+      geom
+    } else throw new IllegalArgumentException("Wrong number of points " + points.size)
 
 }
 

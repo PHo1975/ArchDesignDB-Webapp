@@ -70,4 +70,8 @@ class DecoratedCell(module: BuildingModule, nref:Reference, ndata: Seq[Constant]
   def ceilingCenter: VectorConstant =this.topPlane.plane.toWorldVector(ceilingPoints.getMidPoint)
 
   def centerPoint:VectorConstant= VectorConstant.midPoint(floorCenter,ceilingCenter)
+
+  def getEdges(edgesList:collection.mutable.Set[Seq[Int]])={
+
+  }
 }

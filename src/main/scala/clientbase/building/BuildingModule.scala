@@ -1,6 +1,6 @@
 package clientbase.building
 
-import building.{CutPlane, NoCutPlane}
+import building.{CutPlane, NoCutPlane, PartArea}
 import clientbase.control._
 import clientbase.tableview.PluginModule
 import clientbase.viewer2d.{ControllerState, MouseButtons}
@@ -9,18 +9,18 @@ import definition.expression.ObjectReference
 import definition.typ.SelectGroup
 import org.denigma.threejs.{Raycaster, Scene, Vector2, WebGLRenderer}
 import org.scalajs.dom
-import org.scalajs.dom.html._
+import org.scalajs.dom.html.{Button, Div, Input, Label, Span}
 import org.scalajs.dom.raw.{ClientRect, Event, HTMLElement, MouseEvent}
 import scalatags.JsDom.all._
-import util.{StrToDouble, StringUtils}
+import util.{StrToDouble, StrToInt, StringUtils}
 
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 
 object SelectKind extends Enumeration {
-  val Cells=Value("Zellen")
-  val PartAreas=Value("PartArea")
-  val Planes=Value("Ebenen")
+  val Cells: SelectKind.Value =Value("Zellen")
+  val PartAreas: SelectKind.Value =Value("PartArea")
+  val Planes: SelectKind.Value =Value("Ebenen")
 }
 
 trait MyCanvas {
@@ -92,15 +92,18 @@ trait AbstractViewModel {
   var objectSelectListener:Option[ObjectSelectListener]=None
 
   val opaqueEdit: Input =ActiveEditField.apply("text","", {
-    case StrToDouble(factor) =>
-      BuildingDataModel.oqacity = factor
-      viewModel.updateData()
-      canvas.repaint()
+    case StrToInt(partAreaID) =>
+      viewModel3D.decoratedPartAreas.get(partAreaID) match {
+        case Some(pa)=>
+          val newSelection = Seq(SelectGroup(new OwnerReference(2, dataModel.buildingRef), Array(pa)))
+          SelectionController.select(newSelection)
+        case None =>
+      }
     case o => println("wrong factor " + o)
   })
   val auswahlLabel: Span =span("Auswahl:").render
   val headerNode: Div = div(`class` := "building-topline")(dimensionButton,auswahlLabel,cellInput,cellLabel,span("  "),
-    paInput,paLabel,span(" "),plInput,plLabel,div(style:="flex-grow:2;")/*,opaqueEdit,viewButton*/).render
+    paInput,paLabel,span(" "),plInput,plLabel,div(style:="flex-grow:2;"),opaqueEdit/*,viewButton*/).render
   cellInput.checked=true
 
   val canvas3D=new Building3DCanvas(this)
