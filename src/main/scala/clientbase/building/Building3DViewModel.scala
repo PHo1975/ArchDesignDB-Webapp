@@ -3,17 +3,16 @@ package clientbase.building
 import building.{NoCutPlane, PartArea}
 import clientbase.connection.WebSocketConnector
 import clientbase.viewer2d.Handlers.CompositionHandler
-import clientbase.viewer2d.{ElemContainer, GraphElem, MyBufferGeometry, ShapeBufferGeometry}
+import clientbase.viewer2d.{ElemContainer, GraphElem, ShapeBufferGeometry}
 import definition.data.{OwnerReference, Reference}
 import definition.expression.{IntConstant, Plane3D, PointList, VectorConstant}
 import org.denigma.threejs._
+import org.scalajs.dom.window
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.math.Ordering.Double.TotalOrdering
 import scala.scalajs.js
-import scala.scalajs.js.typedarray.Float32Array
-import org.scalajs.dom.window
 
 
 class Building3DViewModel(module:BuildingModule) extends ElemContainer with AbstractViewModel {
@@ -32,7 +31,7 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
   var maxZ: Double = Float.MinValue.toDouble
 
   protected val geomList: ArrayBuffer[Mesh] = ArrayBuffer[Mesh]()
-  val edgeList=ArrayBuffer[Edge]()
+  val edgeList: ArrayBuffer[Edge] =ArrayBuffer[Edge]()
 
   val decoratedPartAreas: mutable.Map[Int, DecoratedPartArea] = collection.mutable.HashMap[Int, DecoratedPartArea]()
   val decoratedPlanes: mutable.HashMap[Int, DecoratedPlane] = collection.mutable.HashMap[Int, DecoratedPlane]()
@@ -41,6 +40,7 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
     clearGeometry()
     createGeometry()
     createDecoratedPlanes()
+    module.canvas3D.updateResize()
   }
 
   def createPartArea(owner: Array[OwnerReference], plane: Int, firstCell: Int, next: () => Unit): Unit = {
@@ -67,10 +67,10 @@ class Building3DViewModel(module:BuildingModule) extends ElemContainer with Abst
     val nplaneZPoints = Seq(npz1, VectorConstant(maxX, minY, minZ - planeDistance), VectorConstant(maxX, maxY, minZ - planeDistance),
       VectorConstant(minX, maxY, minZ - planeDistance), npz1)
     val planeUtils: PlaneCalcUtil = new PlaneCalcUtil {
-      val planeX: Plane3D = nplaneX;
-      val planeY: Plane3D = nplaneY;
+      val planeX: Plane3D = nplaneX
+      val planeY: Plane3D = nplaneY
       val planeZ: Plane3D = nplaneZ
-      val planeXPoints: Seq[VectorConstant] = nplaneXPoints;
+      val planeXPoints: Seq[VectorConstant] = nplaneXPoints
       val planeYPoints: Seq[VectorConstant] = nplaneYPoints
       val planeZPoints: Seq[VectorConstant] = nplaneZPoints
     }

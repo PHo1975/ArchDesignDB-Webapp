@@ -1,6 +1,6 @@
 package clientbase.building
 
-import building.{CutPlane, NoCutPlane, PartArea}
+import building.{CutPlane, NoCutPlane}
 import clientbase.control._
 import clientbase.tableview.PluginModule
 import clientbase.viewer2d.{ControllerState, MouseButtons}
@@ -9,10 +9,10 @@ import definition.expression.ObjectReference
 import definition.typ.SelectGroup
 import org.denigma.threejs.{Raycaster, Scene, Vector2, WebGLRenderer}
 import org.scalajs.dom
-import org.scalajs.dom.html.{Button, Div, Input, Label, Span}
+import org.scalajs.dom.html._
 import org.scalajs.dom.raw.{ClientRect, Event, HTMLElement, MouseEvent}
 import scalatags.JsDom.all._
-import util.{StrToDouble, StrToInt, StringUtils}
+import util.{StrToInt, StringUtils}
 
 import scala.scalajs.js.annotation.JSExportTopLevel
 
@@ -79,6 +79,7 @@ trait AbstractViewModel {
   val viewButton: Button =button("Ansicht").render
 
   val dimensionButton:Button=button("2d").render
+  val testButton:Button=button("Test").render
 
   val dataModel=new BuildingDataModel(this)
 
@@ -102,7 +103,7 @@ trait AbstractViewModel {
     case o => println("wrong factor " + o)
   })
   val auswahlLabel: Span =span("Auswahl:").render
-  val headerNode: Div = div(`class` := "building-topline")(dimensionButton,auswahlLabel,cellInput,cellLabel,span("  "),
+  val headerNode: Div = div(`class` := "building-topline")(testButton,dimensionButton,auswahlLabel,cellInput,cellLabel,span("  "),
     paInput,paLabel,span(" "),plInput,plLabel,div(style:="flex-grow:2;"),opaqueEdit/*,viewButton*/).render
   cellInput.checked=true
 
@@ -216,6 +217,20 @@ trait AbstractViewModel {
     viewModel.updateData()
     mainNode.appendChild(canvas.canvasHolder)
     canvas.updateResize()
+    canvas.repaint()
+  }
+
+  testButton.onclick= (_:MouseEvent)=>{
+    dimensionButton.textContent=if(is3DMode)"3D" else "2D"
+    is3DMode= false
+    mainNode.removeChild(canvas.canvasHolder)
+    viewModel.clearGeometry()
+    canvas= canvas2D
+    viewModel= viewModel2D
+    viewModel.clearGeometry()
+    viewModel2D.createGeometry(true)
+    mainNode.appendChild(canvas.canvasHolder)
+    //canvas.updateResize()
     canvas.repaint()
   }
 

@@ -23,7 +23,7 @@ protected[building] trait PlaneCalcUtil{
 
 
 object BuildingDataModel {
-  var oqacity:Double=0.7
+  val oqacity:Double=0.8
   val u2=new Vector3(1d,0d,0d)
   val v2=new Vector3(0d,1d,0d)
   val greyColor: Int = -6710887

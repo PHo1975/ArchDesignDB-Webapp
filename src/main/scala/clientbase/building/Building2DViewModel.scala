@@ -1,96 +1,45 @@
 package clientbase.building
 import building.{NoCutPlane, PartArea}
 import clientbase.viewer2d.Handlers.{CompositionHandler, UndefinedComposition}
-import clientbase.viewer2d.SelectionDecorable
-import definition.data.{Composition, Referencable, Reference, ShellLayer}
-import definition.expression.{Line3D, NULLVECTOR, Plane3D, VectorConstant}
-import org.denigma.threejs.{Line, Mesh}
+import definition.data.{Composition, Reference, ShellLayer}
+import definition.expression.{NULLVECTOR, Plane3D, VectorConstant}
+import org.denigma.threejs.Mesh
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.math.Ordering.Double
 import scala.scalajs.js
+import scala.scalajs.js.annotation.{JSExportStatic, JSExportTopLevel, ScalaJSDefined}
 
 
 class EndInfo(val basePoint:VectorConstant,val fillPos:Array[VectorConstant])
 
-class CloneInnerIterator[B ](mainIterator:Iterator[B]) extends Iterator[B] {
-  private var first=true
-  private var mbuffer:B= _
-  private var useBuffer=false
-  override def hasNext: Boolean = {
-    mainIterator.hasNext
-  }
-  override def next(): B = {
-    if (first) {
-      first=false
-      mainIterator.next
-    }  else {
-      if(useBuffer){
-        useBuffer=false
-        mbuffer
-      } else {
-        mbuffer=mainIterator.next()
-        useBuffer=true
-        mbuffer
-      }
-    }
-  }
-}
 
-class DecoratedLine(module:BuildingModule,start:VectorConstant,end:VectorConstant,val pa:PartArea,val mesh:Seq[Line],colors:Seq[Int],val norm:VectorConstant,val composition:Composition)
-  extends SelectionDecorable with Referencable {
-  def numLayers: Int =if(composition==null) 0 else composition.shellLayers.size
-  lazy val dir: VectorConstant =end-start
+@ScalaJSDefined class Building2dViewConstants extends js.Object
 
-  def createDefaultEndpointArray(startPoint:VectorConstant,norm:VectorConstant): Array[VectorConstant] =
-    if(composition==null) Array.empty
-    else{
-      new CloneInnerIterator(composition.shellLayers.reverseIterator.map(_.thickness).
-        scanLeft(startPoint)((np: VectorConstant, thick: Double)=>np+norm*thick)).toArray.reverse
-    }
-
-  val firstEnd=new EndInfo(start,createDefaultEndpointArray(start+norm*pa.align,norm))
-  val secondEnd=new EndInfo(end,createDefaultEndpointArray(end+norm*pa.align,norm))
-
-  def getPoint(firstPoint:Boolean): EndInfo =if (firstPoint) firstEnd else secondEnd
-  def getOtherPoint(firstPoint:Boolean): EndInfo =if (firstPoint) secondEnd else firstEnd
-  def getAxis(ix:Int): Line3D =Line3D(firstEnd.fillPos(ix),dir)
-
-  override def showSelection(): Unit = {
-    for(m<-mesh)
-       m.material=BuildingDataModel.lineSelectMaterial
-    module.canvas.repaint()
-  }
-
-  override def hideSelection(): Unit = {
-    for(i<-mesh.indices;m=mesh(i);color=colors(i))
-    m.material=BuildingDataModel.getLineMaterial(color)
-    module.canvas.repaint()
-  }
-
-  override def ref: Reference = pa.ref
-  override def toString: String ="Pa "+ref
-  
-  def createFillQuads(): Unit = if(composition!=null){
-    //val maxShell=composition.shellLayers.size-1
-    for(layerIx<-composition.shellLayers.indices;layer=composition.shellLayers(layerIx)) {
-      val startPoint1=firstEnd.fillPos(layerIx*2)
-      val startPoint2=firstEnd.fillPos(layerIx*2+1)
-      val endPoint1=secondEnd.fillPos(layerIx*2)
-      val endPoint2=secondEnd.fillPos(layerIx*2+1)
-      val points=Seq(startPoint1,startPoint2,endPoint2,endPoint1)
-      val geom=BuildingDataModel.createQuadGeometry(points)
-      val mesh=new Mesh(geom,BuildingDataModel.getMeshMaterial(layer.color))
-      module.canvas2D.scene.add(mesh)
-      module.viewModel2D.fillList+=mesh
-    }
-  }
+@JSExportTopLevel("Building2dViewConstants") object Building2dViewConstants  {
+  @JSExportStatic var firstAufbau=8
+  @JSExportStatic var firstAlign=0d
+  @JSExportStatic var firstFlip=false
+  @JSExportStatic def setFirstFlip(v:Boolean)=firstFlip=v
+  @JSExportStatic var secondAufbau=9
+  @JSExportStatic var secondAlign=0d
+  @JSExportStatic var secondFlip=true
+  @JSExportStatic var p1=VectorConstant(0,0,0)
+  @JSExportStatic var p2=VectorConstant(0,5,0)
+  @JSExportStatic var p3=VectorConstant(-4,6,0)
+  @JSExportStatic def setP3(x:Double,y:Double,z:Double)=p3=VectorConstant(x,y,z)
+  @JSExportStatic def setsecondFlip(flip:Boolean)=secondFlip=flip
+  @JSExportStatic var p4=VectorConstant(4,8,0)
+  @JSExportStatic def setP4(x:Double,y:Double,z:Double)=p4=VectorConstant(x,y,z)
+  @JSExportStatic var cellCenter=VectorConstant(1,2,0)
+  val toZ: VectorConstant = VectorConstant(0,0,-2)
+  val toZ2: VectorConstant = VectorConstant(0,0,1)
 }
 
 
 
-class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
+class Building2DViewModel(module:BuildingModule) extends AbstractViewModel  {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   var minX: Double =Float.MaxValue.toDouble
   var minY: Double =Float.MaxValue.toDouble
@@ -106,19 +55,14 @@ class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
   protected val nodeMap: mutable.HashMap[(Double, Double), List[(DecoratedLine,Boolean)]] =mutable.HashMap[(Double,Double),List[(DecoratedLine,Boolean)]]()
 
 
-
-  val toZ: VectorConstant = VectorConstant(0,0,-3)
-
   implicit val ordering: Double.TotalOrdering.type =Ordering.Double.TotalOrdering
 
-  protected val geometryList: mutable.ArrayBuffer[DecoratedLine] =collection.mutable.ArrayBuffer[DecoratedLine]()
+  protected val decoratedLinesList: mutable.ArrayBuffer[DecoratedLine] =collection.mutable.ArrayBuffer[DecoratedLine]()
   val fillList= mutable.ArrayBuffer[Mesh]()
 
-  def getLine(ID:Int): Option[DecoratedLine] =geometryList.find(_.ref.instance==ID)
+  def getLine(ID:Int): Option[DecoratedLine] =decoratedLinesList.find(_.ref.instance==ID)
 
-  override def cutPlaneChanged(): Unit = {
-    updateData()
-  }
+  override def cutPlaneChanged(): Unit = updateData()
 
   override def updateData(): Unit = {
     clearGeometry()
@@ -128,11 +72,9 @@ class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
   }
 
   def clearGeometry():Unit= {
-    for(g<-geometryList.iterator;m<-g.mesh) {
-      module.canvas2D.scene.remove(m)
-      m.geometry.dispose()
-    }
-    geometryList.clear()
+    for(dl<-decoratedLinesList.iterator)
+      dl.deleteLineMeshes()
+    decoratedLinesList.clear()
     for(f<-fillList){
       module.canvas2D.scene.remove(f)
       f.geometry.dispose()
@@ -151,7 +93,7 @@ class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
   }
 
 
-  def createGeometry(): Unit = {
+  def createGeometry(test:Boolean=false): Unit = {
     var loopHasFinished=false
     var numLines:Int=0
     var linesFinished=0
@@ -166,108 +108,120 @@ class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
     }
 
     clearGeometry()
-    if(module.currentCutPlane!=NoCutPlane){
+    if(test) {
+      import Building2dViewConstants._
+      val pa1=new PartArea(module.dataModel,Reference(0,1),0,1,0,firstAufbau,firstAlign,firstFlip)
+      val pa2=new PartArea(module.dataModel,Reference(0,2),0,1,0,secondAufbau,secondAlign,secondFlip)
+      val pa3=new PartArea(module.dataModel,Reference(0,3),0,1,0,0,secondAlign,secondFlip)
+      //val pa4=new PartArea(module.dataModel,Reference(0,4),0,1,0,firstAufbau,firstAlign,firstFlip)
+      cellCenters(1)=cellCenter
+      for(comp1<-CompositionHandler.getComposition(firstAufbau);
+          comp2<-CompositionHandler.getComposition(secondAufbau)){
+        createDecoratedLine(p1,p2,pa1,comp1)
+        createDecoratedLine(p2,p3,pa2,comp2)
+        createDecoratedLine(p1,p3,pa3,UndefinedComposition)
+        //createDecoratedLine(p2,p4,pa4,comp1)
+        checkNodes(first = true)
+
+      }
+    }
+    else if(module.currentCutPlane!=NoCutPlane){
       val defPlane: Plane3D =module.currentCutPlane.plane
-      println("defplane:"+defPlane)
       BuildingDataModel.loopPartAreas(NoCutPlane, module.dataModel.partAreaSubscriber.map.valuesIterator.filter(
         ! _.defPlane.plane.isLinearyDependentFrom(defPlane)),(pointList,partArea)=>if(pointList.points.nonEmpty&&partArea.aufbau!= -10){
         val paDefPlane=partArea.defPlane.plane
         val cutLine=defPlane.intersectionWith(paDefPlane)
         val l1= paDefPlane.getAreaCoords(cutLine.pos)
         val l2= paDefPlane.getAreaCoords(cutLine.pos+cutLine.dir)
-        val intersections: Seq[VectorConstant] =pointList.removeDoublePoints().removeStraightEdges().edges.flatMap(_.getIntersectionWith(l1,l2)).sortBy(_._1).
+        val intersections: Seq[VectorConstant] =pointList.removeDoublePoints().removeStraightEdges().edges.
+          flatMap(_.getIntersectionWith(l1,l2)).sortBy(_._1).
           map(el=>defPlane.getAreaCoords(paDefPlane.toWorldVector(el._2)))
         numLines+=intersections.size/2
         if(CompositionHandler.compositionExists(partArea.aufbau))
           for (comp <- CompositionHandler.getComposition(partArea.aufbau)) {
             for (li <- intersections.grouped(2); if li.size == 2)
-              createDecoratedLines(li(0), li(1), partArea, comp)
-            module.canvas2D.repaint()
+              createDecoratedLine(li(0), li(1), partArea, comp)
           }
         else for (li <- intersections.grouped(2); if li.size == 2)
-          createDecoratedLines(li(0), li(1),partArea,UndefinedComposition)
+          createDecoratedLine(li(0), li(1),partArea,UndefinedComposition)
       })
       loopHasFinished=true
-      if(linesFinished==numLines) checkNodes(linesFinished,true)
+      if(linesFinished==numLines) checkNodes(first = true)
     }
 
-    def createDecoratedLines(start:VectorConstant,end:VectorConstant,pa:PartArea,comp:Composition): Unit = {
-      def putDL(dl:DecoratedLine):Unit= {
-        addToNodeMap(start.x,start.y,dl,true)
-        addToNodeMap(end.x,end.y,dl,false)
-        geometryList+=dl
-        linesFinished+=1
-        if(loopHasFinished&&linesFinished==numLines) checkNodes(linesFinished,false)
-      }
-      checkPoint(start)
-      checkPoint(end)
-      if(comp.shellLayers.isEmpty) putDL(new DecoratedLine(module,start+toZ,end+toZ,pa,Seq(internDrawLine(pa,start,end,pa.aufbau)),Seq(pa.aufbau),NULLVECTOR,null))
+    def createDecoratedLine(start:VectorConstant,end:VectorConstant,pa:PartArea,comp:Composition): Unit = {
+      import Building2dViewConstants.toZ
+      checkMaxExtension(start)
+      checkMaxExtension(end)
+      if(comp.shellLayers.isEmpty) putDL(new DecoratedLine(module,start+toZ,end+toZ,pa,Seq(pa.aufbau),NULLVECTOR,null))
       else {
         val delta=end-start
         val cellCenter=getCellCenter(pa.firstCellID)
         val norm=delta.norm2d*(-1*java.lang.Math.signum(VectorConstant.pointLocation2D(start,end,cellCenter)*(if(pa.flip)-1 else 1)))
         var deltaVect=norm*pa.align
-        var lineBuffer=new ArrayBuffer[Line]()
         var colorBuffer=new ArrayBuffer[Int]()
-        lineBuffer+=internDrawLine(pa,start+deltaVect,end+deltaVect,0)
         colorBuffer+=0
         for(layer<-comp.shellLayers.reverseIterator){
           deltaVect=deltaVect+norm*layer.thickness
-          lineBuffer+=internDrawLine(pa,start+deltaVect,end+deltaVect,layer.color)
           colorBuffer+=layer.color
         }
-        putDL(new DecoratedLine(module,start+toZ,end+toZ,pa,lineBuffer.toSeq,colorBuffer.toSeq,norm,comp))
+        putDL(new DecoratedLine(module,start+toZ,end+toZ,pa,colorBuffer.toSeq,norm,comp))
+      }
+
+      def putDL(dl:DecoratedLine):Unit= {
+        addToNodeMap(start.x,start.y,dl,firstPoint = true)
+        addToNodeMap(end.x,end.y,dl,firstPoint = false)
+        decoratedLinesList+=dl
+        linesFinished+=1
+        if(loopHasFinished&&linesFinished==numLines) checkNodes(first = false)
       }
     }
   }
 
+
   def getCellCenter(cellID:Int): VectorConstant =cellCenters.getOrElseUpdate(cellID,
     module.currentCutPlane.plane.getAreaCoords(module.dataModel.cellSubscriber.map(cellID).centerPoint))
 
-  protected def checkPoint(v:VectorConstant): Unit = {
+  protected def checkMaxExtension(v:VectorConstant): Unit = {
     minX=Math.min(minX,v.x)
     maxX=Math.max(maxX,v.x)
     minY=Math.min(minY,v.y)
     maxY=Math.max(maxY,v.y)
   }
 
-  protected def internDrawLine(pa:PartArea,start:VectorConstant,end:VectorConstant,color:Int):Line= {
-    val mesh=BuildingDataModel.createLine(start+toZ, end+toZ, BuildingDataModel.getLineMaterial(0))
-    mesh.name=pa.ref.instance.toString
-    module.canvas2D.scene.add(mesh)
-    mesh
-  }
 
-
-  def checkNodes(numLines:Int,first:Boolean): Unit ={
-    println("CheckNodes "+numLines+" first:"+first)
-    println(nodeMap.mkString("\n "))
-    println("Num node lines:"+nodeMap.valuesIterator.foldLeft(0)((v,list)=>v+list.size))
-    for(node<-nodeMap.valuesIterator){
+  def checkNodes(first:Boolean): Unit ={
+    println("CheckNodes  first:"+first)
+    println(" "+nodeMap.mkString("\n "))
+    for(node: scala.List[(DecoratedLine, Boolean)] <-nodeMap.valuesIterator){
       node.size match {
         case 1=> println("Only one Line at node:"+node.head)
         case 2=>
-          val lineA=node.head._1
-          val lineAFP=node.head._2
-          val lineB=node.last._1
-          val lineBFP=node.last._2
+          val lineA: DecoratedLine =node.head._1
+          val lineAisFirstPoint=node.head._2
+          val lineB: DecoratedLine =node.last._1
+          val lineBisFirstPoint=node.last._2
           if(!lineA.norm.isNearlyLinearyDependentFrom(lineB.norm)&& lineA.norm!=NULLVECTOR&& lineB.norm!=NULLVECTOR) { // lines are not parallel
-            val thisLineP2=lineA.getOtherPoint(lineAFP).basePoint
-            val aPoint=lineA.getPoint(lineAFP)
-            val bPoint=lineB.getPoint(lineBFP)
-            val crossPoint=aPoint.basePoint
-            val otherLineP2=lineB.getOtherPoint(lineBFP).basePoint
+            val thisLineP2=lineA.getOtherPoint(lineAisFirstPoint).basePoint
+            val aPointInfo: EndInfo =lineA.getPointInfo(lineAisFirstPoint)
+            val bPointInfo: EndInfo =lineB.getPointInfo(lineBisFirstPoint)
+            val crossPoint=aPointInfo.basePoint
+            val otherLineP2=lineB.getOtherPoint(lineBisFirstPoint).basePoint
+            println("thisP2:"+thisLineP2+" cross:"+crossPoint+" otherP2:"+otherLineP2)
             val bendLeft=VectorConstant.pointLocation2D(thisLineP2,crossPoint,otherLineP2)>0
+            val thisNormLeft=VectorConstant.pointLocation2D(thisLineP2,crossPoint,crossPoint+lineA.norm)>0
             val otherNormLeft=VectorConstant.pointLocation2D(crossPoint,otherLineP2,crossPoint+lineB.norm)>0
-            val aReverse= !(bendLeft ^ lineA.pa.flip)
-            val lineALayerIterator= if(aReverse) lineA.composition.shellLayers.indices.reverseIterator
-                                    else lineA.composition.shellLayers.indices.iterator
-            val bReverse= !(bendLeft ^lineB.pa.flip)
-            val lineBLayerIterator = if(bReverse) lineB.composition.shellLayers.indices.reverseIterator
-                                    else lineB.composition.shellLayers.indices.iterator
-            println("Node between "+lineA+" and "+lineB +" bendLeft:"+bendLeft+" otherNormLeft:"+otherNormLeft+" areverse:"+aReverse+" bReverse:"+bReverse)
+            val aReverse=true// !((bendLeft ^ lineA.pa.flip)^(!thisNormLeft))
             val lineALayers=lineA.composition.shellLayers
-            val lineBLayers=lineB.composition.shellLayers
+            println("LineA Shell layers "+lineALayers.mkString("| "))
+            val lineBLayers: Seq[ShellLayer] =lineB.composition.shellLayers
+            println("LineB Shell layers "+lineBLayers.mkString("| "))
+            val lineALayerIterator= if(aReverse) lineALayers.indices.reverseIterator
+                                    else lineALayers.indices.iterator
+            val bReverse=true// !((bendLeft ^lineB.pa.flip)^(! otherNormLeft))
+            val lineBLayerIterator = if(bReverse) lineBLayers.indices.reverseIterator
+                                    else lineBLayers.indices.iterator
+            println("Node between "+lineA+" and "+lineB +" > bendLeft:"+bendLeft+" thisNormLeft:"+thisNormLeft+" otherNormLeft:"+otherNormLeft+" areverse:"+aReverse+" bReverse:"+bReverse)
             var lineBLayerIx= lineBLayerIterator.next()
             var lineALayerIx= -1
             var lastHandledBIx= -1
@@ -276,60 +230,79 @@ class Building2DViewModel(module:BuildingModule) extends AbstractViewModel {
               val firstLineIxA=lineALayerIx*2+(if (aReverse) 1 else 0)
               val secondLineIxA=lineALayerIx*2+(if (aReverse) 0 else 1)
               val currentLineALayer=lineALayers(lineALayerIx)
-              println("lineALayerIx "+lineALayerIx+" firstLineIxA:"+firstLineIxA+" secondLineIxA:"+secondLineIxA)
+              println("lineALayerIx "+lineALayerIx+" firstLineIxA:"+firstLineIxA+" secondLineIxA:"+secondLineIxA+" lineBLayerIX:"+lineBLayerIx+
+                " APrio:"+currentLineALayer.priority+ " BPrio:"+lineBLayers(lineBLayerIx).priority+" lastBX:"+lastHandledBIx)
 
               while (currentLineALayer.priority>lineBLayers(lineBLayerIx).priority&&(lineBLayerIterator.hasNext||lastHandledBIx!=lineBLayerIx)) {
                 val firstLineIxB=lineBLayerIx*2+(if (bReverse) 1 else 0)
                 val secondLineIxB=lineBLayerIx*2+(if (bReverse) 0 else 1)
                 val laAxis=lineA.getAxis(firstLineIxA)
-                bPoint.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
-                bPoint.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
+                bPointInfo.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
+                bPointInfo.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
                 lastHandledBIx=lineBLayerIx
-                if(lineBLayerIterator.hasNext)
+                if(lineBLayerIterator.hasNext) {
                   lineBLayerIx=lineBLayerIterator.next()
+                  println("step Line B to:"+lineBLayerIx+" BPrio:"+lineBLayers(lineBLayerIx).priority)
+                }
               }
-              val lineIxB=lineBLayerIx*2+(if (bReverse ^ (!lineBLayerIterator.hasNext) ) 1 else 0)
+              val lineIxB=lineBLayerIx*2+(if (bReverse ^ (lineBLayers(lineBLayerIx).priority<currentLineALayer.priority) ) 1 else 0)
               val lbAxis=lineB.getAxis(lineIxB)
-              aPoint.fillPos(firstLineIxA)=lbAxis.intersectionWith(lineA.getAxis(firstLineIxA))
-              aPoint.fillPos(secondLineIxA)=lbAxis.intersectionWith(lineA.getAxis(secondLineIxA))
+              println("setLine A to BIX:"+lineIxB+" b hasnext:"+lineBLayerIterator.hasNext)
+              aPointInfo.fillPos(firstLineIxA)=lbAxis.intersectionWith(lineA.getAxis(firstLineIxA))
+              aPointInfo.fillPos(secondLineIxA)=lbAxis.intersectionWith(lineA.getAxis(secondLineIxA))
 
               if(currentLineALayer.priority==lineBLayers(lineBLayerIx).priority&& lineBLayerIterator.hasNext) {
                 val firstLineIxB=lineBLayerIx*2+(if (bReverse) 1 else 0)
                 val secondLineIxB=lineBLayerIx*2+(if (bReverse) 0 else 1)
                 val laAxis=lineA.getAxis(secondLineIxA)
-                bPoint.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
-                bPoint.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
+                bPointInfo.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
+                bPointInfo.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
                 lastHandledBIx=lineBLayerIx
                 lineBLayerIx = lineBLayerIterator.next()
               }
             }
-            val secondLineIxA=lineALayerIx*2+(if (aReverse) 0 else 1)
-            println("LineA Loop done, lineB IX:"+lineBLayerIx)
 
+            println("LineA Loop done, lineBLayerIX:"+lineBLayerIx+" lastHandledBIx:"+lastHandledBIx+" lineB hasNext:"+lineBLayerIterator.hasNext)
+            println("lineAlayerIx:"+lineALayerIx)
             while(lineBLayerIterator.hasNext|| (lineBLayerIx!=lastHandledBIx)){
               val firstLineIxB=lineBLayerIx*2+(if (bReverse) 1 else 0)
               val secondLineIxB=lineBLayerIx*2+(if (bReverse) 0 else 1)
-              val laAxis=lineA.getAxis(secondLineIxA)
-              bPoint.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
-              bPoint.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
+              println("Priority b:"+lineBLayers(lineBLayerIx).priority+" a:"+lineALayers(lineALayerIx).priority)
+              val lineAX=if(lineBLayers(lineBLayerIx).priority>=lineALayers(lineALayerIx).priority) lineALayerIx*2+(if (aReverse) 0 else 1)
+              else lineBLayerIx*2+(if (bReverse) 1 else 0)
+              println("FirstLineIXB:"+firstLineIxB+" secondLineIXB:"+secondLineIxB+" lineAx:"+lineAX)
+              val laAxis=lineA.getAxis(lineAX)
+              bPointInfo.fillPos(firstLineIxB)=laAxis.intersectionWith(lineB.getAxis(firstLineIxB))
+              bPointInfo.fillPos(secondLineIxB)=laAxis.intersectionWith(lineB.getAxis(secondLineIxB))
               lastHandledBIx=lineBLayerIx
               if(lineBLayerIterator.hasNext)
                 lineBLayerIx = lineBLayerIterator.next()
+              println("LineBLayerIX:"+lineBLayerIx)
             }
 
           }
+
         case 3=>
+          val firstLine=node.head._1
+          val secondLine=node(1)._1
+          val thirdLine=node.last._1
+          if(firstLine.dir.isNearlyLinearyDependentFrom(secondLine.dir))check3NodesStraight(node.head,node(1),node.last) else
+          if(firstLine.dir.isNearlyLinearyDependentFrom(thirdLine.dir))check3NodesStraight(node.head,node.last,node(1)) else
+          if(thirdLine.dir.isNearlyLinearyDependentFrom(secondLine.dir))check3NodesStraight(node.last,node(1),node.head)
+          else {
+            println("3 Lines ")
+          }
         case 4=>
         case more=> println("To large number of nodes: "+more+" "+node.mkString("|"))
       }
     }
-    for(dl<-geometryList)dl.createFillQuads()
+    for(dl<-decoratedLinesList)dl.createFillQuads()
+    module.canvas2D.updateResize()
     module.canvas2D.repaint()
   }
 
-
-
-
-
+  def check3NodesStraight(sline1:(DecoratedLine,Boolean),sline2:(DecoratedLine,Boolean),otherLine:(DecoratedLine,Boolean)): Unit = {
+    println("3 Nodes Straight s1"+sline1+" s2:"+sline2+" other:"+otherLine)
+  }
 
 }
