@@ -9,13 +9,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.math.Ordering.Double
 import scala.scalajs.js
-import scala.scalajs.js.annotation.{JSExportStatic, JSExportTopLevel, ScalaJSDefined}
+import scala.scalajs.js.annotation.{JSExportStatic, JSExportTopLevel}
 
 
 class EndInfo(val basePoint:VectorConstant,val fillPos:Array[VectorConstant])
 
 
-@ScalaJSDefined class Building2dViewConstants extends js.Object
+/*@ScalaJSDefined*/ class Building2dViewConstants extends js.Object
 
 @JSExportTopLevel("Building2dViewConstants") object Building2dViewConstants  {
   @JSExportStatic var firstAufbau=8

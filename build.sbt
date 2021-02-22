@@ -22,6 +22,7 @@ libraryDependencies += "com.lihaoyi" %%% "scalatags" % "0.8.2"
 libraryDependencies += "threejs-facade" %%% "threejs-facade" % "0.1-SNAPSHOT"
 //libraryDependencies += "io.github.cquiroz" %%% "scala-java-locales" % "0.5.3-cldr31"
 updateOptions := updateOptions.value.withLatestSnapshots(false)
+scalacOptions += "-P:scalajs:sjsDefinedByDefault"
 addCommandAlias("f", "fastOptJS")
 scalaJSUseMainModuleInitializer := true
 

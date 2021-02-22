@@ -53,7 +53,7 @@ trait MyCanvas {
   def scene:Scene
   def renderer : WebGLRenderer
   def repaint():Unit
-  def pickElems(screenX: Double, screenY: Double): Option[Referencable]
+  def pickElems(screenX: Double, screenY: Double): scala.Option[Referencable]
   def module:BuildingModule
 }
 
@@ -90,7 +90,7 @@ trait AbstractViewModel {
   var viewModel:AbstractViewModel=viewModel3D
 
   var selectObjectConstraints:Array[Int]=Array.empty
-  var objectSelectListener:Option[ObjectSelectListener]=None
+  var objectSelectListener:scala.Option[ObjectSelectListener]=None
 
   val opaqueEdit: Input =ActiveEditField.apply("text","", {
     case StrToInt(partAreaID) =>

@@ -44,11 +44,14 @@ class DimLineElement(nref:Reference,ncolor:Int,position:VectorConstant,style:Int
         case _ =>
       }
     }
-    val delta = (styleInfo.textPosition + styleInfo.textHeight) / 10d
-    minx -= delta
-    miny -= delta
-    maxx += delta
-    maxy += delta
+    if(styleInfo==null) println("DimLineElement +"+ref+" style:"+style+" styleInfo==null")
+    else {
+      val delta = (styleInfo.textPosition + styleInfo.textHeight) / 10d
+      minx -= delta
+      miny -= delta
+      maxx += delta
+      maxy += delta
+    }
     BRect(minx, miny, maxx, maxy)
   }
 
